@@ -1,15 +1,9 @@
-
-
-// export default PastReports;
-
-
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllReports, initDB } from "../../utils/indexedDB";
+import { getUnsyncedReports, initDB } from "../../utils/indexedDB";
 import MapDisplay from "../MapDisplay";
 
-function PastReports() {
+function PendingReports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -18,8 +12,8 @@ function PastReports() {
     const fetchReports = async () => {
       try {
         await initDB();
-        const allReports = await getAllReports();
-        setReports(allReports);
+        const unsyncedReports = await getUnsyncedReports();
+        setReports(unsyncedReports);
       } catch (error) {
         // Error fetching reports handled silently
       } finally {
@@ -44,24 +38,19 @@ function PastReports() {
     <div style={styles.screen}>
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.title}>Past Reports</h2>
+          <h2 style={styles.title}>Pending Reports</h2>
+          <p style={styles.subtitle}>Reports waiting to sync to server</p>
+          
           {loading ? (
             <p style={styles.loading}>Loading reports…</p>
           ) : reports.length === 0 ? (
-            <p style={styles.noReports}>No reports yet.</p>
+            <p style={styles.noReports}>No pending reports. All synced! ✅</p>
           ) : (
             reports.map((r) => (
               <div key={r.id} style={styles.reportCard}>
                 <div style={styles.reportHeader}>
                   <span style={styles.incidentType}>{r.incidentType}</span>
-                  <span
-                    style={{
-                      ...styles.syncStatus,
-                      backgroundColor: r.synced ? "#16a34a" : "#991b1b",
-                    }}
-                  >
-                    {r.synced ? "✓ Synced" : "⧗ Pending"}
-                  </span>
+                  <span style={styles.syncStatus}>⧗ Pending</span>
                 </div>
                 <p style={styles.reportText}><strong>Severity:</strong> {r.severity}</p>
                 {r.description && <p style={styles.reportText}><strong>Description:</strong> {r.description}</p>}
@@ -81,14 +70,10 @@ function PastReports() {
                 <p style={styles.timestamp}>
                   <strong>Created:</strong> {new Date(r.createdAt).toLocaleString()}
                 </p>
-                {r.syncedAt && (
-                  <p style={styles.timestamp}>
-                    <strong>Synced:</strong> {new Date(r.syncedAt).toLocaleString()}
-                  </p>
-                )}
               </div>
             ))
           )}
+          
           <button style={styles.button} onClick={() => navigate("/responder-form")}>
             Back to Form
           </button>
@@ -125,6 +110,12 @@ const styles = {
     textAlign: "center",
     marginBottom: "1.5rem",
   },
+  subtitle: {
+    fontSize: "0.95rem",
+    color: "#666",
+    textAlign: "center",
+    marginBottom: "1.5rem",
+  },
   loading: { textAlign: "center", fontStyle: "italic", color: "#555" },
   noReports: { textAlign: "center", fontStyle: "italic", color: "#777" },
   reportCard: {
@@ -132,7 +123,7 @@ const styles = {
     borderRadius: "12px",
     padding: "15px",
     marginBottom: "12px",
-    border: "1px solid #e0e0e0",
+    border: "2px solid #fbbf24",
     boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
   },
   reportHeader: {
@@ -148,6 +139,7 @@ const styles = {
   },
   syncStatus: {
     color: "#fff",
+    backgroundColor: "#ea580c",
     padding: "4px 8px",
     borderRadius: "6px",
     fontSize: "11px",
@@ -179,4 +171,4 @@ const styles = {
   },
 };
 
-export default PastReports;
+export default PendingReports;

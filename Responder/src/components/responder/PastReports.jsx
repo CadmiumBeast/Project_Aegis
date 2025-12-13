@@ -1,12 +1,8 @@
-
-
-// export default PastReports;
-
-
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllReports, initDB } from "../../utils/indexedDB";
+import { db, auth } from "../../firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import MapDisplay from "../MapDisplay";
 
 function PastReports() {
@@ -18,7 +14,37 @@ function PastReports() {
     const fetchReports = async () => {
       try {
         await initDB();
-        const allReports = await getAllReports();
+        
+        // Get local reports from IndexedDB
+        const localReports = await getAllReports();
+        let allReports = [...localReports];
+        
+        // Get synced reports from Firestore (if user is authenticated)
+        if (auth.currentUser) {
+          try {
+            const reportsRef = collection(db, "responderReports");
+            const snapshot = await getDocs(reportsRef);
+            
+            snapshot.forEach((doc) => {
+              allReports.push({
+                id: doc.id,
+                ...doc.data(),
+                synced: true,
+                isFirestore: true
+              });
+            });
+          } catch (err) {
+            // Firestore fetch failed, just show local reports
+          }
+        }
+        
+        // Sort by date (newest first)
+        allReports.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.syncedAt || 0);
+          const dateB = new Date(b.createdAt || b.syncedAt || 0);
+          return dateB - dateA;
+        });
+        
         setReports(allReports);
       } catch (error) {
         // Error fetching reports handled silently
@@ -79,11 +105,16 @@ function PastReports() {
                   />
                 )}
                 <p style={styles.timestamp}>
-                  <strong>Created:</strong> {new Date(r.createdAt).toLocaleString()}
+                  <strong>Created:</strong> {new Date(r.createdAt || r.timestamp).toLocaleString()}
                 </p>
                 {r.syncedAt && (
                   <p style={styles.timestamp}>
                     <strong>Synced:</strong> {new Date(r.syncedAt).toLocaleString()}
+                  </p>
+                )}
+                {r.isFirestore && (
+                  <p style={styles.timestamp}>
+                    <strong>Source:</strong> Cloud (Firestore)
                   </p>
                 )}
               </div>
