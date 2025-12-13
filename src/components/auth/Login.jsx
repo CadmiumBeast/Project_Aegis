@@ -1,4 +1,7 @@
-function Login({ switchToSignup }) {
+
+  
+//   export default Login;
+function Login({ switchToSignup, onSuccess }) {
     return (
       <>
         <h2 style={styles.title}>Welcome Back</h2>
@@ -8,7 +11,13 @@ function Login({ switchToSignup }) {
           <input type="email" placeholder="Email" style={styles.input} />
           <input type="password" placeholder="Password" style={styles.input} />
   
-          <button style={styles.button}>Login</button>
+          <button
+            type="button"
+            style={styles.button}
+            onClick={onSuccess} // triggers navigation to form
+          >
+            Login
+          </button>
         </form>
   
         <p style={styles.footerText}>

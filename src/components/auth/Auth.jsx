@@ -1,17 +1,34 @@
+
+
+// export default Auth;
+
+
 import { useState } from "react";
 import Login from "./Login";
 import Signup from "./Signup";
+import ResponderForm from "../responder/ResponderForm";
 
 function Auth() {
   const [isLogin, setIsLogin] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  if (isAuthenticated) {
+    return <ResponderForm />;
+  }
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
         {isLogin ? (
-          <Login switchToSignup={() => setIsLogin(false)} />
+          <Login
+            switchToSignup={() => setIsLogin(false)}
+            onSuccess={() => setIsAuthenticated(true)}
+          />
         ) : (
-          <Signup switchToLogin={() => setIsLogin(true)} />
+          <Signup
+            switchToLogin={() => setIsLogin(true)}
+            onSuccess={() => setIsAuthenticated(true)}
+          />
         )}
       </div>
     </div>

@@ -1,12 +1,20 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import Signup from "./components/auth/Signup";
+
+
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Auth from "./components/auth/Auth";
+import ResponderForm from "./components/responder/ResponderForm";
+import PastReports from "./components/responder/PastReports";
 
 function App() {
-  return <Auth />;
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Auth />} />
+        <Route path="/responder-form" element={<ResponderForm />} />
+        <Route path="/past-reports" element={<PastReports />} />
+      </Routes>
+    </Router>
+  );
 }
 
 export default App;
