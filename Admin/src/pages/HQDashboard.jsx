@@ -18,14 +18,20 @@ L.Icon.Default.mergeOptions({
 // Custom marker icons based on severity with required colors
 const getMarkerIcon = (severity) => {
   let color, borderColor;
-  if (severity <= 2) {
-    color = '#902820'; // redbrick
+  if (severity === 1) {
+    color = '#228B22'; // green
+    borderColor = '#ffffff';
+  } else if (severity === 2) {
+    color = '#32CD32'; // light green
     borderColor = '#ffffff';
   } else if (severity === 3) {
-    color = '#F5D6BA'; // sand
+    color = '#FFD700'; // yellow
     borderColor = '#333333';
+  } else if (severity === 4) {
+    color = '#FF8C00'; // orange
+    borderColor = '#ffffff';
   } else {
-    color = '#307638'; // green
+    color = '#DC143C'; // red (severity 5+)
     borderColor = '#ffffff';
   }
   
@@ -56,6 +62,44 @@ function MapCenter({ center, zoom, shouldCenter }) {
   
   return null;
 }
+
+// Map coordinates to Sri Lankan districts
+const getDistrictFromCoordinates = (lat, lng) => {
+  const districts = [
+    { name: 'Colombo District', lat: 6.9271, lng: 79.8612 },
+    { name: 'Galle District', lat: 6.0367, lng: 80.2170 },
+    { name: 'Matara District', lat: 5.7494, lng: 80.5354 },
+    { name: 'Ratnapura District', lat: 6.6828, lng: 80.4032 },
+    { name: 'Kandy District', lat: 7.2906, lng: 80.6337 },
+    { name: 'Kurunegala District', lat: 7.4833, lng: 80.3667 },
+    { name: 'Kegalle District', lat: 7.2525, lng: 80.8394 },
+    { name: 'Badulla District', lat: 6.9931, lng: 81.0567 },
+    { name: 'Nuwara Eliya District', lat: 6.9271, lng: 80.7789 },
+    { name: 'Jaffna District', lat: 9.6615, lng: 80.7855 },
+    { name: 'Batticaloa District', lat: 7.7102, lng: 81.6924 },
+    { name: 'Trincomalee District', lat: 8.5711, lng: 81.2344 },
+    { name: 'Ampara District', lat: 7.2908, lng: 81.6753 },
+    { name: 'Mannar District', lat: 8.9833, lng: 80.3167 },
+    { name: 'Vavuniya District', lat: 8.7531, lng: 80.5000 },
+    { name: 'Mullaitivu District', lat: 8.2991, lng: 81.8789 },
+  ];
+
+  // Find the closest district
+  let closestDistrict = districts[0];
+  let minDistance = Infinity;
+
+  districts.forEach(district => {
+    const distance = Math.sqrt(
+      Math.pow(lat - district.lat, 2) + Math.pow(lng - district.lng, 2)
+    );
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestDistrict = district;
+    }
+  });
+
+  return closestDistrict.name;
+};
 
 // Fallback data if Firebase is not configured
 const getFallbackIncidents = () => {
@@ -606,21 +650,33 @@ export default function HQDashboard() {
         {/* Center Panel - Map */}
         <main className="map-panel">
           <div className="map-header">
-            <h3>Ratnapura District</h3>
-            <p>6.6828°N, 80.4032°E</p>
+            <h3>
+              {selectedIncident?.locationName 
+                ? selectedIncident.locationName 
+                : getDistrictFromCoordinates(mapCenter[0], mapCenter[1])}
+            </h3>
+            <p>{mapCenter[0].toFixed(4)}°N, {mapCenter[1].toFixed(4)}°E</p>
           </div>
           <div className="severity-legend">
             <div className="legend-item">
-              <span className="legend-dot redbrick"></span>
-              <span>Sev 1-2</span>
+              <span className="legend-dot" style={{ backgroundColor: '#228B22' }}></span>
+              <span>Sev 1 - Safe</span>
             </div>
             <div className="legend-item">
-              <span className="legend-dot sand"></span>
-              <span>Sev 3</span>
+              <span className="legend-dot" style={{ backgroundColor: '#32CD32' }}></span>
+              <span>Sev 2 - Low</span>
             </div>
             <div className="legend-item">
-              <span className="legend-dot green"></span>
-              <span>Sev 4-5</span>
+              <span className="legend-dot" style={{ backgroundColor: '#FFD700' }}></span>
+              <span>Sev 3 - Moderate</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#FF8C00' }}></span>
+              <span>Sev 4 - High</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ backgroundColor: '#DC143C' }}></span>
+              <span>Sev 5 - Critical</span>
             </div>
           </div>
           <MapContainer
