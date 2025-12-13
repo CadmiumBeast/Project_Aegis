@@ -120,6 +120,7 @@ export default function HQDashboard() {
   const [mapZoom, setMapZoom] = useState(11);
   const [shouldCenterMap, setShouldCenterMap] = useState(false);
   const [firebaseError, setFirebaseError] = useState(null);
+  const [responders, setResponders] = useState({});
   const listRef = useRef(null);
   const selectedCardRef = useRef(null);
 
@@ -127,6 +128,35 @@ export default function HQDashboard() {
     localStorage.removeItem('hq_user_email');
     navigate('/hq/login');
   };
+
+  // Get responder details by ID
+  const getResponderDetails = (responderID) => {
+    if (!responderID) return { name: 'Unknown', number: 'N/A', email: 'N/A' };
+    return responders[responderID] || { name: 'Unknown', number: 'N/A', email: 'N/A' };
+  };
+
+  // Fetch responders from Firebase
+  useEffect(() => {
+    try {
+      const usersRef = collection(db, 'users');
+      const unsubscribe = onSnapshot(usersRef, (snapshot) => {
+        const respondersData = {};
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          respondersData[doc.id] = {
+            id: doc.id,
+            name: data.name || 'Unknown',
+            number: data.number || data.phone || 'N/A',
+            email: data.email || 'N/A',
+          };
+        });
+        setResponders(respondersData);
+      });
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Error fetching responders:', error);
+    }
+  }, []);
 
   // Fetch incidents from Firebase
   useEffect(() => {
@@ -137,6 +167,8 @@ export default function HQDashboard() {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const fetchedIncidents = snapshot.docs.map(doc => {
           const data = doc.data();
+          const responderID = data.responderID || 'UNKNOWN';
+          const responderData = getResponderDetails(responderID);
           return {
             id: doc.id,
             type: data.incidentType || 'UNKNOWN',
@@ -144,7 +176,9 @@ export default function HQDashboard() {
             status: data.status || 'NEW',
             timestamp: data.timestamp ? new Date(data.timestamp) : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()),
             location: { lat: data.latitude || 6.6828, lng: data.longitude || 80.4032 },
-            responder: data.responder || 'UNKNOWN',
+            responderID: responderID,
+            responder: responderData?.name || 'UNKNOWN',
+            responderData: responderData,
             locationName: data.locationName || '',
             description: data.description || '',
             photo_url: data.photo || null,
@@ -177,7 +211,7 @@ export default function HQDashboard() {
       setIncidents(getFallbackIncidents());
       setIsLoadingIncidents(false);
     }
-  }, []);
+  }, [responders]);
 
 
   // Monitor online/offline status
@@ -613,7 +647,9 @@ export default function HQDashboard() {
                 <div className="detail-section">
                   <h4>Reported</h4>
                   <p>{selectedIncident.timestamp.toLocaleString()}</p>
-                  <p><strong>Responder:</strong> {selectedIncident.responder}</p>
+                  <p><strong>Responder:</strong> {selectedIncident.responderData?.name || 'Unknown'}</p>
+                  <p><strong>Phone:</strong> {selectedIncident.responderData?.number || 'N/A'}</p>
+                  <p><strong>Email:</strong> {selectedIncident.responderData?.email || 'N/A'}</p>
                 </div>
 
                 <div className="detail-section">

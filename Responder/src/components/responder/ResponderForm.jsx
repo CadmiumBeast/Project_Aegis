@@ -31,7 +31,7 @@ function ResponderForm() {
 
   useEffect(() => {
     initDB();
-    
+    console.log(auth.currentUser);
     // Sign in anonymously if not already signed in
     if (!auth.currentUser) {
       signInAnonymously(auth)
@@ -309,8 +309,9 @@ function ResponderForm() {
             photo: photoURL,
             createdAt: new Date(report.createdAt),
             syncedAt: new Date(),
+            responderID: auth.currentUser ? auth.currentUser.uid : "anonymous",
           };
-          
+          console.log(reportData);
           // Only add fields if they exist and are not null/undefined
           if (report.latitude !== undefined && report.latitude !== null) {
             reportData.latitude = report.latitude;
