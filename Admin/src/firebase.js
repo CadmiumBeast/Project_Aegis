@@ -1,10 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -16,20 +12,38 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
-
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence)
-  .catch((error) => {
-    console.error("Failed to enable persistence:", error);
-  });
-
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager() 
-  })
+// Log config to verify it's loaded (remove in production)
+console.log('Firebase Config:', {
+  apiKey: firebaseConfig.apiKey ? '✓ Loaded' : '✗ Missing',
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
 });
-export const storage = getStorage(app);
 
-export { auth, db };
+let app;
+let auth;
+let db;
+let storage;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
+
+  // Set auth persistence
+  setPersistence(auth, browserLocalPersistence)
+    .catch((error) => {
+      console.error("Failed to enable persistence:", error);
+    });
+
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase initialization failed:', error);
+  // Create fallback objects to prevent crashes
+  auth = null;
+  db = null;
+  storage = null;
+}
+
+export { auth, db, storage };
 export default app;

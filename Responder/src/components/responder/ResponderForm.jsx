@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveReport, initDB, getUnsyncedReports, deleteReport, clearAllReports } from "../../utils/indexedDB";
 import MapDisplay from "../MapDisplay";
@@ -21,6 +21,12 @@ function ResponderForm() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [touchStartY, setTouchStartY] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [voiceLanguage, setVoiceLanguage] = useState('en-US');
+  const [interimText, setInterimText] = useState('');
+  const recognitionRef = useRef(null);
+  const restartTimeoutRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,6 +57,15 @@ function ResponderForm() {
     if (navigator.onLine) {
        setTimeout(() => syncDataToAPI(), 1000);
     }
+
+    // Initialize Speech Recognition
+    initializeSpeechRecognition();
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -67,6 +82,193 @@ function ResponderForm() {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  // === ENHANCED VOICE RECOGNITION SETUP ===
+  const initializeSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.log("Speech Recognition not supported");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = voiceLanguage;
+    recognition.maxAlternatives = 3; // Get multiple interpretations
+
+    recognition.onstart = () => {
+      console.log('Voice recognition started');
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        // Use the most confident result
+        const transcript = event.results[i][0].transcript;
+        const confidence = event.results[i][0].confidence;
+        
+        console.log(`Recognized (confidence: ${confidence}): ${transcript}`);
+        
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      setInterimText(interimTranscript);
+      
+      if (finalTranscript) {
+        processVoiceCommand(finalTranscript.trim());
+        setTranscript(finalTranscript.trim());
+        // Clear transcript after 2 seconds
+        setTimeout(() => setTranscript(''), 2000);
+      } else {
+        setTranscript(interimTranscript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      
+      // Handle specific errors
+      if (event.error === 'no-speech') {
+        console.log('No speech detected, continuing to listen...');
+        return; // Don't stop listening
+      }
+      
+      if (event.error === 'audio-capture') {
+        alert('Microphone not accessible. Please check permissions.');
+        setIsListening(false);
+      } else if (event.error === 'not-allowed') {
+        alert('Microphone access denied. Please grant permissions.');
+        setIsListening(false);
+      } else {
+        // For other errors, try to restart
+        console.log('Attempting to restart recognition...');
+        setTimeout(() => {
+          if (isListening && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              console.log('Could not restart:', e);
+            }
+          }
+        }, 1000);
+      }
+    };
+
+    recognition.onend = () => {
+      console.log('Recognition ended');
+      // Auto-restart if still in listening mode
+      if (isListening) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+            console.log('Recognition restarted');
+          } catch (e) {
+            console.log('Could not restart:', e);
+            setIsListening(false);
+          }
+        }, 300);
+      }
+    };
+
+    recognitionRef.current = recognition;
+  };
+
+  const processVoiceCommand = (command) => {
+    const lowerCommand = command.toLowerCase();
+    console.log('Processing command:', command);
+
+    let commandProcessed = false;
+
+    // Multilingual Incident Type Detection
+    // English + Spanish + French + Hindi + Arabic
+    if (lowerCommand.match(/landslide|deslizamiento|glissement|भूस्खलन/i)) {
+      setFormData(prev => ({ ...prev, incidentType: 'Landslide' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/flood|inundación|inondation|बाढ़/i)) {
+      setFormData(prev => ({ ...prev, incidentType: 'Flood' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/road block|roadblock|bloqueo|blocage|सड़क अवरोध/i)) {
+      setFormData(prev => ({ ...prev, incidentType: 'Road Block' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/power line|powerline|línea eléctrica|ligne électrique|बिजली लाइन/i)) {
+      setFormData(prev => ({ ...prev, incidentType: 'Power Line Down' }));
+      commandProcessed = true;
+    }
+
+    // Multilingual Severity Detection
+    if (lowerCommand.match(/critical|crítico|critique|गंभीर|severity 5|level 5|nivel 5|niveau 5/i)) {
+      setFormData(prev => ({ ...prev, severity: '5' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/high|alto|haut|उच्च|severity 4|level 4|nivel 4|niveau 4/i)) {
+      setFormData(prev => ({ ...prev, severity: '4' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/medium|medio|moyen|मध्यम|severity 3|level 3|nivel 3|niveau 3/i)) {
+      setFormData(prev => ({ ...prev, severity: '3' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/low|bajo|bas|कम|severity 2|level 2|nivel 2|niveau 2/i)) {
+      setFormData(prev => ({ ...prev, severity: '2' }));
+      commandProcessed = true;
+    } else if (lowerCommand.match(/minimal|mínimo|निम्न|severity 1|level 1|nivel 1|niveau 1/i)) {
+      setFormData(prev => ({ ...prev, severity: '1' }));
+      commandProcessed = true;
+    }
+
+    // Description append (only if not a control command)
+    if (!lowerCommand.match(/submit|save|enviar|guardar|soumettre|enregistrer|जमा|सहेजें/i) && !commandProcessed) {
+      setFormData(prev => ({ 
+        ...prev, 
+        description: prev.description ? `${prev.description} ${command}` : command 
+      }));
+    }
+
+    // Submit command (multilingual)
+    if (lowerCommand.match(/submit report|save report|enviar informe|guardar informe|soumettre rapport|enregistrer rapport|रिपोर्ट जमा/i)) {
+      setTimeout(() => {
+        document.querySelector('form')?.requestSubmit();
+      }, 500);
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) {
+      alert('Voice recognition not supported in this browser. Try Chrome, Edge, or Safari.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      clearTimeout(restartTimeoutRef.current);
+      setIsListening(false);
+      setTranscript('');
+      setInterimText('');
+    } else {
+      try {
+        // Update language before starting
+        recognitionRef.current.lang = voiceLanguage;
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (e) {
+        console.error('Could not start recognition:', e);
+        alert('Could not start voice recognition. Please check microphone permissions.');
+      }
+    }
+  };
+
+  // Re-initialize recognition when language changes
+  useEffect(() => {
+    if (recognitionRef.current && !isListening) {
+      recognitionRef.current.lang = voiceLanguage;
+    }
+  }, [voiceLanguage, isListening]);
 
   // --- THE FIXED SYNC FUNCTION ---
   const syncDataToAPI = async () => {
@@ -234,6 +436,49 @@ function ResponderForm() {
             <div style={styles.icon}>🚨</div>
             <h1 style={styles.title}>Incident Report</h1>
             <p style={styles.subtitle}>Field responder submission</p>
+            
+            {/* Voice Input Controls */}
+            <div style={styles.voiceControls}>
+              <select 
+                value={voiceLanguage} 
+                onChange={(e) => setVoiceLanguage(e.target.value)}
+                style={styles.languageSelect}
+                disabled={isListening}
+              >
+                <option value="en-US">🇺🇸 English</option>
+                <option value="es-ES">🇪🇸 Español</option>
+                <option value="fr-FR">🇫🇷 Français</option>
+                <option value="hi-IN">🇮🇳 हिन्दी</option>
+                <option value="ar-SA">🇸🇦 العربية</option>
+                <option value="zh-CN">🇨🇳 中文</option>
+                <option value="pt-BR">🇧🇷 Português</option>
+                <option value="de-DE">🇩🇪 Deutsch</option>
+              </select>
+              
+              <button 
+                type="button"
+                onClick={toggleVoiceInput}
+                style={{
+                  ...styles.voiceButton,
+                  background: isListening ? '#dc2626' : '#8B2E2E',
+                  animation: isListening ? 'pulse 1.5s infinite' : 'none'
+                }}
+              >
+                {isListening ? '🎙️ Listening...' : '🎙️ Voice Input'}
+              </button>
+            </div>
+            
+            {isListening && (
+              <div style={styles.voiceIndicator}>
+                <p style={styles.voiceTranscript}>
+                  {interimText ? <span style={{opacity: 0.6}}>{interimText}</span> : transcript || 'Speak now...'}
+                </p>
+                <p style={styles.voiceHint}>
+                  Say: "Landslide", "Critical severity", "Submit report"
+                </p>
+                <p style={styles.voiceStatus}>🎤 Microphone active - Continuous listening</p>
+              </div>
+            )}
           </div>
 
           {isSyncing && <p style={styles.syncText}>Syncing…</p>}
@@ -449,7 +694,72 @@ const styles = {
     height: "100%",
     objectFit: "cover",
     borderRadius: "12px",
+  },
+  voiceControls: {
+    marginTop: '1rem',
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'center',
+  },
+  languageSelect: {
+    padding: '0.75rem',
+    borderRadius: '12px',
+    border: '2px solid #8B2E2E',
+    background: '#fff',
+    color: '#8B2E2E',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    outline: 'none',
+  },
+  voiceButton: {
+    flex: 1,
+    padding: '0.75rem 1.5rem',
+    borderRadius: '25px',
+    border: 'none',
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+    transition: 'all 0.3s ease',
+  },
+  voiceIndicator: {
+    marginTop: '1rem',
+    padding: '1rem',
+    background: '#fef3c7',
+    borderRadius: '12px',
+    border: '2px solid #f59e0b',
+  },
+  voiceTranscript: {
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: '0.5rem',
+    minHeight: '1.5rem',
+  },
+  voiceHint: {
+    fontSize: '0.75rem',
+    color: '#78350f',
+    fontStyle: 'italic',
+    marginBottom: '0.25rem',
+  },
+  voiceStatus: {
+    fontSize: '0.7rem',
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: '0.5rem',
   }
 };
+
+// Add pulse animation
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default ResponderForm;

@@ -119,6 +119,7 @@ export default function HQDashboard() {
   const [mapCenter, setMapCenter] = useState([6.6828, 80.4032]);
   const [mapZoom, setMapZoom] = useState(11);
   const [shouldCenterMap, setShouldCenterMap] = useState(false);
+  const [firebaseError, setFirebaseError] = useState(null);
   const listRef = useRef(null);
   const selectedCardRef = useRef(null);
 
@@ -155,6 +156,14 @@ export default function HQDashboard() {
         setIsLoadingIncidents(false);
       }, (error) => {
         console.error('Error fetching incidents from Firebase:', error);
+        
+        // Check if it's a permission error
+        if (error.code === 'permission-denied' || error.message.includes('permission')) {
+          setFirebaseError('Firebase permissions not configured. Check FIREBASE_RULES_SETUP.md');
+        } else {
+          setFirebaseError(`Firebase error: ${error.message}`);
+        }
+        
         // Fallback to mock data if Firebase fails
         setIncidents(getFallbackIncidents());
         setIsLoadingIncidents(false);
@@ -163,6 +172,7 @@ export default function HQDashboard() {
       return () => unsubscribe();
     } catch (error) {
       console.error('Firebase initialization error:', error);
+      setFirebaseError(`Firebase init error: ${error.message}`);
       // Fallback to mock data
       setIncidents(getFallbackIncidents());
       setIsLoadingIncidents(false);
@@ -378,6 +388,52 @@ export default function HQDashboard() {
 
       {/* Main Content */}
       <div className="dashboard-content">
+        {/* Firebase Error Banner */}
+        {firebaseError && (
+          <div style={{
+            position: 'fixed',
+            top: '80px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fef3c7',
+            border: '2px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '1rem 1.5rem',
+            zIndex: 9999,
+            maxWidth: '600px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+              <div>
+                <strong style={{ color: '#92400e' }}>Firebase Configuration Needed</strong>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: '#78350f' }}>
+                  {firebaseError}
+                </p>
+                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: '#78350f', fontWeight: '600' }}>
+                  📖 See FIREBASE_RULES_SETUP.md for instructions
+                </p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#78350f', fontStyle: 'italic' }}>
+                  Using demo data for now...
+                </p>
+              </div>
+              <button 
+                onClick={() => setFirebaseError(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                  color: '#92400e'
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Mobile Overlay */}
         {isSidebarOpen && (
           <div 
