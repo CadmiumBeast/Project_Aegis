@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 function Signup({ switchToLogin, onSuccess, isDarkMode }) {
   const [fullName, setFullName] = useState("");
@@ -37,6 +38,16 @@ function Signup({ switchToLogin, onSuccess, isDarkMode }) {
         email,
         password
       );
+      
+      // Save additional user details to Firestore
+      await addDoc(collection(db, "users"), {
+        uid: userCredential.user.uid,
+        fullName: fullName,
+        contactNumber: contactNumber,
+        email: email,
+        createdAt: serverTimestamp(),
+      });
+
       console.log("User signed up and logged in:", userCredential.user);
       onSuccess();
     } catch (err) {
