@@ -1,139 +1,79 @@
 
+
 // export default PastReports;
 
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { saveReport, initDB, getUnsyncedReports, markAsSynced } from "../../utils/indexedDB";
 
-function ResponderForm() {
-  const [formData, setFormData] = useState({
-    incidentType: "",
-    severity: "3",
-    photo: null,
-  });
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [touchStartY, setTouchStartY] = useState(null);
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getAllReports, initDB } from "../../utils/indexedDB";
+
+function PastReports() {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => { initDB().catch(err => console.error("Failed to init DB:", err)); }, []);
-
   useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); syncDataToAPI(); };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+    const fetchReports = async () => {
+      try {
+        await initDB();
+        const allReports = await getAllReports();
+        setReports(allReports);
+      } catch (error) {
+        console.error("Error fetching reports:", error);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchReports();
   }, []);
 
-  const syncDataToAPI = async () => {
-    setIsSyncing(true);
-    try {
-      const unsyncedReports = await getUnsyncedReports();
-      for (const report of unsyncedReports) {
-        try {
-          const response = await fetch("YOUR_API_ENDPOINT/reports", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ incidentType: report.incidentType, severity: report.severity, timestamp: report.timestamp }),
-          });
-          if (response.ok) await markAsSynced(report.id);
-        } catch (err) { console.error("Failed to sync report:", err); }
-      }
-      if (unsyncedReports.length) alert(`${unsyncedReports.length} report(s) synced!`);
-    } catch (err) { console.error("Sync error:", err); }
-    finally { setIsSyncing(false); }
-  };
-
-  const handleTouchStart = e => setTouchStartY(e.touches[0].clientY);
-  const handleTouchEnd = e => { if (touchStartY && e.changedTouches[0].clientY - touchStartY < -100) navigate("/past-reports"); setTouchStartY(null); };
-  const handleChange = e => { 
-    const { name, value, files } = e.target; 
-    if (name === "photo") setFormData({ ...formData, photo: files[0] }); 
-    else setFormData({ ...formData, [name]: value }); 
-  };
-  
-  const handleSubmit = e => {
-    e.preventDefault();
-    const newReport = { incidentType: formData.incidentType, severity: formData.severity, timestamp: new Date().toLocaleString(), photo: formData.photo?.name || null };
-    saveReport(newReport)
-      .then(() => {
-        alert(isOnline ? "Report saved and queued for sync!" : "Report saved locally! Will sync when online.");
-        setFormData({ incidentType: "", severity: "3", photo: null });
-        if (isOnline) syncDataToAPI();
-      })
-      .catch(err => { console.error("Error saving report:", err); alert("Failed to save report."); });
-  };
-
   return (
-    <div style={styles.screen} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div style={styles.screen}>
       <div style={styles.container}>
         <div style={styles.card}>
-          {/* Online/Offline Symbol */}
-          <div style={{...styles.statusSymbol, backgroundColor: isOnline ? "#16a34a" : "#991b1b"}} title={isOnline ? "Online" : "Offline"}></div>
-
-          <div style={styles.headerContent}>
-            <div style={styles.icon}>🚨</div>
-            <h1 style={styles.title}>Incident Report</h1>
-            <p style={styles.subtitle}>Field responder submission</p>
-          </div>
-
-          {isSyncing && <p style={styles.syncText}>Syncing…</p>}
-
-          <form style={styles.form} onSubmit={handleSubmit}>
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Incident Type</label>
-              <select name="incidentType" value={formData.incidentType} onChange={handleChange} required style={styles.input}>
-                <option value="">Select incident</option>
-                <option value="Landslide">Landslide</option>
-                <option value="Flood">Flood</option>
-                <option value="Road Block">Road Block</option>
-                <option value="Power Line Down">Power Line Down</option>
-              </select>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Severity Level</label>
-              <div style={styles.severityGrid}>
-                {["1","2","3","4","5"].map(level => (
-                  <label key={level} style={{ ...styles.severityBox, ...(formData.severity === level ? styles.severityActive : {}) }}>
-                    <input type="radio" name="severity" value={level} checked={formData.severity === level} onChange={handleChange} style={{ display: "none" }} />
-                    {level}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Additional Information (optional)</label>
-              <textarea rows={4} placeholder="Hazards, landmarks, notes…" style={styles.textarea} />
-            </div>
-
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Photo (optional)</label>
-              <div style={styles.photoInputContainer}>
-                <input type="file" name="photo" accept="image/*" onChange={handleChange} style={styles.photoInput} />
-                {formData.photo ? (
-                  <img 
-                    src={URL.createObjectURL(formData.photo)} 
-                    alt="preview" 
-                    style={styles.imagePreviewInside} 
+          <h2 style={styles.title}>Past Reports</h2>
+          {loading ? (
+            <p style={styles.loading}>Loading reports…</p>
+          ) : reports.length === 0 ? (
+            <p style={styles.noReports}>No reports yet.</p>
+          ) : (
+            reports.map((r) => (
+              <div key={r.id} style={styles.reportCard}>
+                <div style={styles.reportHeader}>
+                  <span style={styles.incidentType}>{r.incidentType}</span>
+                  <span
+                    style={{
+                      ...styles.syncStatus,
+                      backgroundColor: r.synced ? "#16a34a" : "#991b1b",
+                    }}
+                  >
+                    {r.synced ? "✓ Synced" : "⧗ Pending"}
+                  </span>
+                </div>
+                <p style={styles.reportText}><strong>Severity:</strong> {r.severity}</p>
+                {r.photo && (
+                  <img
+                    src={r.photo.startsWith("blob:") ? r.photo : `/uploads/${r.photo}`} 
+                    alt="report"
+                    style={styles.reportImage}
                   />
-                ) : (
-                  <span style={styles.photoPlaceholder}>Choose photo</span>
+                )}
+                <p style={styles.timestamp}>
+                  <strong>Created:</strong> {new Date(r.createdAt).toLocaleString()}
+                </p>
+                {r.syncedAt && (
+                  <p style={styles.timestamp}>
+                    <strong>Synced:</strong> {new Date(r.syncedAt).toLocaleString()}
+                  </p>
                 )}
               </div>
-            </div>
-
-            <button type="submit" style={styles.button}>Save Report</button>
-          </form>
-
-          <p style={styles.note}>Swipe up to view past reports</p>
+            ))
+          )}
+          <button style={styles.button} onClick={() => navigate("/responder-form")}>
+            Back to Form
+          </button>
         </div>
       </div>
     </div>
@@ -146,120 +86,79 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    padding: "2rem",
-    background: "linear-gradient(135deg, #b18b8b, #8b5a5a)", // subtle gradient
+    background: "linear-gradient(135deg, #8B2E2E, #3a0d0d)",
     fontFamily: "'Roboto', sans-serif",
+    padding: "2rem",
   },
   container: { width: "100%", maxWidth: "500px" },
   card: {
-    position: "relative",
     background: "#fff",
     borderRadius: "20px",
     padding: "2rem",
-    boxShadow: "0 5px 15px rgba(0,0,0,0.2)", // subtle shadow
-    border: "1px solid rgba(0,0,0,0.05)",
-    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5), 0 0 10px #00000020 inset",
+    border: "1px solid rgba(0,0,0,0.1)",
+    maxHeight: "90vh",
+    overflowY: "auto",
   },
-  statusSymbol: {
-    position: "absolute",
-    top: "15px",
-    right: "15px",
-    width: "15px",
-    height: "15px",
-    borderRadius: "50%",
-    boxShadow: "0 0 5px rgba(0,0,0,0.2)", // subtle glow
-  },
-  headerContent: { textAlign: "center", marginBottom: "2rem" },
-  icon: { fontSize: "3rem", marginBottom: "0.5rem", textShadow: "none" },
-  title: { fontSize: "2rem", fontWeight: "700", color: "#8B2E2E" },
-  subtitle: { fontSize: "0.9rem", color: "#555", opacity: 0.8 },
-  syncText: { fontSize: "0.8rem", color: "#555", fontStyle: "italic", textAlign: "center", marginBottom: "1rem" },
-  form: { display: "flex", flexDirection: "column", gap: "1.5rem" },
-  inputGroup: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-  label: { fontSize: "0.85rem", fontWeight: "600", color: "#8B2E2E" },
-  input: {
-    height: "50px",
-    padding: "0 1rem",
-    borderRadius: "12px",
-    border: "1.5px solid #8B2E2E",
-    background: "#fff",
-    color: "#333",
-    fontSize: "1rem",
-    outline: "none",
-    boxShadow: "none",
-    transition: "0.3s",
-  },
-  textarea: {
-    padding: "0.75rem 1rem",
-    borderRadius: "12px",
-    border: "1.5px solid #8B2E2E",
-    background: "#fff",
-    color: "#333",
-    fontSize: "1rem",
-    resize: "none",
-    boxShadow: "none",
-  },
-  severityGrid: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.5rem" },
-  severityBox: {
-    padding: "0.8rem 0",
-    borderRadius: "12px",
-    border: "2px solid #8B2E2E",
-    textAlign: "center",
+  title: {
+    fontSize: "1.75rem",
     fontWeight: "700",
-    cursor: "pointer",
-    fontSize: "0.9rem",
     color: "#8B2E2E",
-    transition: "all 0.2s ease",
-    background: "#fff",
+    textAlign: "center",
+    marginBottom: "1.5rem",
   },
-  severityActive: {
-    background: "#8B2E2E",
+  loading: { textAlign: "center", fontStyle: "italic", color: "#555" },
+  noReports: { textAlign: "center", fontStyle: "italic", color: "#777" },
+  reportCard: {
+    background: "#f9f9f9",
+    borderRadius: "12px",
+    padding: "15px",
+    marginBottom: "12px",
+    border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+  },
+  reportHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "10px",
+  },
+  incidentType: {
+    fontWeight: "700",
+    fontSize: "1rem",
+    color: "#8B2E2E",
+  },
+  syncStatus: {
     color: "#fff",
-    transform: "scale(1.05)",
+    padding: "4px 8px",
+    borderRadius: "6px",
+    fontSize: "11px",
+    fontWeight: "bold",
+  },
+  reportText: { fontSize: "0.95rem", marginBottom: "6px", color: "#333" },
+  timestamp: { fontSize: "0.8rem", color: "#666", marginTop: "2px" },
+  reportImage: {
+    width: "100%",
+    height: "150px",
+    objectFit: "cover",
+    borderRadius: "10px",
+    marginBottom: "6px",
+    marginTop: "6px",
   },
   button: {
-    height: "52px",
+    width: "100%",
+    backgroundColor: "#8B2E2E",
+    color: "#fff",
+    padding: "12px",
     borderRadius: "12px",
     border: "none",
-    background: "#8B2E2E",
-    color: "#fff",
+    cursor: "pointer",
     fontWeight: "700",
+    marginTop: "15px",
     fontSize: "1rem",
-    cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-    transition: "transform 0.2s, box-shadow 0.2s",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+    transition: "0.2s",
   },
-  note: { marginTop: "1rem", fontSize: "0.75rem", textAlign: "center", color: "#555" },
-  photoInputContainer: {
-    position: "relative",
-    borderRadius: "12px",
-    border: "2px dashed #8B2E2E",
-    height: "180px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-    cursor: "pointer",
-    background: "#fff",
-    transition: "0.3s",
-  },
-  photoInput: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    opacity: 0,
-    cursor: "pointer",
-  },
-  photoPlaceholder: {
-    color: "#8B2E2E",
-    fontWeight: "600",
-  },
-  imagePreviewInside: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    borderRadius: "12px",
-  }
 };
 
-export default ResponderForm;
+export default PastReports;
