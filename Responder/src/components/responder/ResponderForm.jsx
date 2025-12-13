@@ -545,7 +545,7 @@ function ResponderForm() {
 
             <button type="submit" style={styles.button}>Save Report</button>
           </form>
-
+{/* 
           <button 
             type="button" 
             onClick={handleClearDB} 
@@ -553,9 +553,26 @@ function ResponderForm() {
             style={{...styles.button, ...styles.clearButton, opacity: isClearing ? 0.6 : 1}}
           >
             {isClearing ? "Clearing..." : "🗑️ Clear Data"}
-          </button>
+          </button> */}
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+  {/* Button to view pending reports */}
+  <button
+    type="button"
+    onClick={() => navigate("/pending-reports")}
+    style={{ ...styles.button, flex: 1, background: "#8B2E2E", fontSize: "0.85rem" }}
+  >Pending Reports
+  </button>
 
-          <p style={styles.note}>Swipe up to view past reports</p>
+  {/* Button to view past reports */}
+  <button
+    type="button"
+    onClick={() => navigate("/past-reports")}
+    style={{ ...styles.button, flex: 1, background: "#8B2E2E", fontSize: "0.85rem"  }}
+  >Past Reports
+  </button>
+</div>
+
+         
         </div>
       </div>
     </div>

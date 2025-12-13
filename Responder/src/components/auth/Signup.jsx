@@ -338,6 +338,4 @@ const styles = {
     fontWeight: "500",
   },
 };
-
 export default Signup;
-

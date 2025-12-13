@@ -52,9 +52,9 @@ function Auth() {
         },
         card: {
           backgroundColor: "#1f1f1f",
-          padding: "40px",
-          width: "380px",
-          borderRadius: "16px",
+          // padding: "40px",
+          // width: "380px",
+          // borderRadius: "16px",
           textAlign: "center",
           boxShadow: "0 15px 30px rgba(0,0,0,0.5)",
           position: "relative",
@@ -63,19 +63,16 @@ function Auth() {
     }
     return {
       container: {
-        height: "100vh",
-        background: "linear-gradient(135deg, #8B1E3F, #F7C1A1)",
+        // height: "100vh",
+        background: "linear-gradient(135deg, #8B2E2E 0%, #A03A3A 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       },
       card: {
-        backgroundColor: "#FFF3EC",
-        padding: "40px",
+        // padding: "40px",
         width: "380px",
-        borderRadius: "16px",
         textAlign: "center",
-        boxShadow: "0 15px 30px rgba(0,0,0,0.2)",
         position: "relative",
       },
     };
