@@ -10,11 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "firebase": "^12.6.0",
-=======
     "@react-spring/web": "^10.0.3",
->>>>>>> 0d27efb35e1e082e26dc9f082c8b8b0c284ced55
+    "firebase": "^12.6.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.1"
