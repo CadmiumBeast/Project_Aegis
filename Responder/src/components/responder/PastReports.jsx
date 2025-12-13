@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllReports, initDB } from "../../utils/indexedDB";
+import MapDisplay from "../MapDisplay";
 
 function PastReports() {
   const [reports, setReports] = useState([]);
@@ -20,13 +21,23 @@ function PastReports() {
         const allReports = await getAllReports();
         setReports(allReports);
       } catch (error) {
-        console.error("Error fetching reports:", error);
+        // Error fetching reports handled silently
       } finally {
         setLoading(false);
       }
     };
 
     fetchReports();
+
+    // Refresh reports when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchReports();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   return (
@@ -53,9 +64,16 @@ function PastReports() {
                   </span>
                 </div>
                 <p style={styles.reportText}><strong>Severity:</strong> {r.severity}</p>
+                {r.description && <p style={styles.reportText}><strong>Description:</strong> {r.description}</p>}
+                {r.latitude && r.longitude && (
+                  <>
+                    <MapDisplay latitude={r.latitude} longitude={r.longitude} incidentType={r.incidentType} />
+                    <p style={styles.reportText}><strong>Coordinates:</strong> {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}</p>
+                  </>
+                )}
                 {r.photo && (
                   <img
-                    src={r.photo.startsWith("blob:") ? r.photo : `/uploads/${r.photo}`} 
+                    src={r.photo}
                     alt="report"
                     style={styles.reportImage}
                   />

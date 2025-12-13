@@ -41,8 +41,12 @@ export const saveReport = async (reportData) => {
     };
 
     const request = store.add(report);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => {
+      reject(request.error);
+    };
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
   });
 };
 
@@ -72,11 +76,14 @@ export const getUnsyncedReports = async () => {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], "readonly");
     const store = transaction.objectStore(STORE_NAME);
-    const index = store.index("synced");
-    const request = index.getAll(false);
+    const request = store.getAll();
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const allReports = request.result;
+      const unsyncedReports = allReports.filter(report => report.synced === false);
+      resolve(unsyncedReports);
+    };
   });
 };
 
