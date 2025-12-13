@@ -189,41 +189,41 @@ function ResponderForm() {
     let commandProcessed = false;
 
     // Multilingual Incident Type Detection
-    // English + Spanish + French + Hindi + Arabic
-    if (lowerCommand.match(/landslide|deslizamiento|glissement|भूस्खलन/i)) {
+    // English + Sinhala + Tamil
+    if (lowerCommand.match(/landslide|භූමිෂ්ථර|நிலச்சரிவு/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Landslide' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/flood|inundación|inondation|बाढ़/i)) {
+    } else if (lowerCommand.match(/flood|ගංවතුර|வெள்ளம்/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Flood' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/road block|roadblock|bloqueo|blocage|सड़क अवरोध/i)) {
+    } else if (lowerCommand.match(/road block|roadblock|මාර්ග අවහිරතා|சாலை தடை/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Road Block' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/power line|powerline|línea eléctrica|ligne électrique|बिजली लाइन/i)) {
+    } else if (lowerCommand.match(/power line|powerline|විදුලි රැහැන්|மின்சார கம்பி/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Power Line Down' }));
       commandProcessed = true;
     }
 
     // Multilingual Severity Detection
-    if (lowerCommand.match(/critical|crítico|critique|गंभीर|severity 5|level 5|nivel 5|niveau 5/i)) {
+    if (lowerCommand.match(/critical|තීව්‍ර|முக்கியமான|severity 5|level 5/i)) {
       setFormData(prev => ({ ...prev, severity: '5' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/high|alto|haut|उच्च|severity 4|level 4|nivel 4|niveau 4/i)) {
+    } else if (lowerCommand.match(/high|ඉහළ|உயர்|severity 4|level 4/i)) {
       setFormData(prev => ({ ...prev, severity: '4' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/medium|medio|moyen|मध्यम|severity 3|level 3|nivel 3|niveau 3/i)) {
+    } else if (lowerCommand.match(/medium|මධ්‍යම|நடுத்தர|severity 3|level 3/i)) {
       setFormData(prev => ({ ...prev, severity: '3' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/low|bajo|bas|कम|severity 2|level 2|nivel 2|niveau 2/i)) {
+    } else if (lowerCommand.match(/low|අඩු|குறைந்த|severity 2|level 2/i)) {
       setFormData(prev => ({ ...prev, severity: '2' }));
       commandProcessed = true;
-    } else if (lowerCommand.match(/minimal|mínimo|निम्न|severity 1|level 1|nivel 1|niveau 1/i)) {
+    } else if (lowerCommand.match(/minimal|අවම|குறைந்தபட்ச|severity 1|level 1/i)) {
       setFormData(prev => ({ ...prev, severity: '1' }));
       commandProcessed = true;
     }
 
     // Description append (only if not a control command)
-    if (!lowerCommand.match(/submit|save|enviar|guardar|soumettre|enregistrer|जमा|सहेजें/i) && !commandProcessed) {
+    if (!lowerCommand.match(/submit|save|ඉදිරිපත්|சமர்ப்பிக்க/i) && !commandProcessed) {
       setFormData(prev => ({ 
         ...prev, 
         description: prev.description ? `${prev.description} ${command}` : command 
@@ -231,7 +231,7 @@ function ResponderForm() {
     }
 
     // Submit command (multilingual)
-    if (lowerCommand.match(/submit report|save report|enviar informe|guardar informe|soumettre rapport|enregistrer rapport|रिपोर्ट जमा/i)) {
+    if (lowerCommand.match(/submit report|save report|වාර්තාව ඉදිරිපත්|அறிக்கை சமர்ப்பிக்க/i)) {
       setTimeout(() => {
         document.querySelector('form')?.requestSubmit();
       }, 500);
@@ -445,14 +445,9 @@ function ResponderForm() {
                 style={styles.languageSelect}
                 disabled={isListening}
               >
-                <option value="en-US">🇺🇸 English</option>
-                <option value="es-ES">🇪🇸 Español</option>
-                <option value="fr-FR">🇫🇷 Français</option>
-                <option value="hi-IN">🇮🇳 हिन्दी</option>
-                <option value="ar-SA">🇸🇦 العربية</option>
-                <option value="zh-CN">🇨🇳 中文</option>
-                <option value="pt-BR">🇧🇷 Português</option>
-                <option value="de-DE">🇩🇪 Deutsch</option>
+                <option value="en-US">🇬🇧 English</option>
+                <option value="si-LK">🇱🇰 සිංහල (Sinhala)</option>
+                <option value="ta-LK">🇱🇰 தமிழ் (Tamil)</option>
               </select>
               
               <button 
