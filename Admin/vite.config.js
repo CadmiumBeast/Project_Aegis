@@ -12,5 +12,25 @@ export default defineConfig({
         name: 'Project Aegis',
         short_name: 'Aegis',
       }
-    })],
+    })
+  ],
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        entryFileNames: '[name].[hash].js',
+        chunkFileNames: '[name].[hash].js',
+        assetFileNames: '[name].[hash].[ext]'
+      }
+    }
+  },
+  server: {
+    port: 5173,
+    host: true,
+    mimeTypes: {
+      'application/javascript': ['js', 'jsx']
+    }
+  }
 })
