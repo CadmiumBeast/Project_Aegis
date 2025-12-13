@@ -135,6 +135,35 @@ export default function HQDashboard() {
     return responders[responderID] || { name: 'Unknown', number: 'N/A', email: 'N/A' };
   };
 
+  // Parse timestamp in multiple formats
+  const parseTimestamp = (timestamp) => {
+    // Firestore Timestamp object
+    if (timestamp?.toDate) {
+      return timestamp.toDate();
+    }
+    
+    // String format
+    if (typeof timestamp === 'string') {
+      // ISO format: "2025-12-13T15:13:58.406Z"
+      if (timestamp.includes('T') && timestamp.includes('Z')) {
+        return new Date(timestamp);
+      }
+      
+      // DD/MM/YYYY, HH:MM:SS format: "14/12/2025, 03:38:34"
+      const ddmmyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4}),\s(\d{1,2}):(\d{2}):(\d{2})$/;
+      const ddmmMatch = timestamp.match(ddmmyyyyRegex);
+      if (ddmmMatch) {
+        const [, day, month, year, hours, minutes, seconds] = ddmmMatch;
+        return new Date(year, month - 1, day, hours, minutes, seconds);
+      }
+      
+      // Localized/default format: "14/12/2025, 03:38:34" or other formats
+      return new Date(timestamp);
+    }
+    
+    return new Date();
+  };
+
   // Fetch responders from Firebase
   useEffect(() => {
     try {
@@ -169,12 +198,23 @@ export default function HQDashboard() {
           const data = doc.data();
           const responderID = data.responderID || 'UNKNOWN';
           const responderData = getResponderDetails(responderID);
+          
+          // Handle multiple timestamp formats
+          let timestamp;
+          if (data.timestamp) {
+            timestamp = parseTimestamp(data.timestamp);
+          } else if (data.createdAt) {
+            timestamp = parseTimestamp(data.createdAt);
+          } else {
+            timestamp = new Date();
+          }
+          
           return {
             id: doc.id,
             type: data.incidentType || 'UNKNOWN',
             severity: parseInt(data.severity) || 3,
             status: data.status || 'NEW',
-            timestamp: data.timestamp ? new Date(data.timestamp) : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date()),
+            timestamp: timestamp,
             location: { lat: data.latitude || 6.6828, lng: data.longitude || 80.4032 },
             responderID: responderID,
             responder: responderData?.name || 'UNKNOWN',
