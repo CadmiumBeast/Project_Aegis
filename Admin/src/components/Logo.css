@@ -1,0 +1,66 @@
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.logo-large .logo-image {
+  width: 450px;
+  height: 300px;
+  max-height: 300px;
+}
+
+.logo-medium .logo-image {
+  width: 120px;
+  height: auto;
+  max-height: 144px;
+}
+
+.logo-small .logo-image {
+  width: 60px;
+  height: auto;
+  max-height: 72px;
+}
+
+.logo-text {
+  text-align: center;
+}
+
+.logo-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #8B2E2E;
+  margin: 0;
+  letter-spacing: 0.1em;
+}
+
+.logo-subtitle {
+  font-size: 0.9rem;
+  color: #8B2E2E;
+  margin: 0;
+  font-weight: 400;
+}
+
+.logo-medium .logo-title {
+  font-size: 1.8rem;
+}
+
+.logo-medium .logo-subtitle {
+  font-size: 0.75rem;
+}
+
+.logo-small .logo-title {
+  font-size: 1.2rem;
+}
+
+.logo-small .logo-subtitle {
+  font-size: 0.6rem;
+}
+
