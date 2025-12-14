@@ -12,8 +12,10 @@ function PendingReports() {
     const fetchReports = async () => {
       try {
         await initDB();
-        const unsyncedReports = await getUnsyncedReports();
-        setReports(unsyncedReports);
+        const allReports = await getAllReports();
+        // Filter only unsynced (pending) reports
+        const pendingReports = allReports.filter(report => !report.synced);
+        setReports(pendingReports);
       } catch (error) {
         // Error fetching reports handled silently
       } finally {
@@ -39,12 +41,10 @@ function PendingReports() {
       <div style={styles.container}>
         <div style={styles.card}>
           <h2 style={styles.title}>Pending Reports</h2>
-          <p style={styles.subtitle}>Reports waiting to sync to server</p>
-          
           {loading ? (
             <p style={styles.loading}>Loading reports…</p>
           ) : reports.length === 0 ? (
-            <p style={styles.noReports}>No pending reports. All synced! ✅</p>
+            <p style={styles.noReports}>No pending reports. All synced!</p>
           ) : (
             reports.map((r) => (
               <div key={r.id} style={styles.reportCard}>

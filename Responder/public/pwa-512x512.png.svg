@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Red shield for responder -->
+  <path d="M256 20 L50 100 L50 220 Q50 360 256 492 Q462 360 462 220 L462 100 Z" fill="#8B2E2E" stroke="#5a1a1a" stroke-width="8"/>
+  
+  <!-- Emergency cross -->
+  <circle cx="256" cy="256" r="130" fill="#ef4444"/>
+  <path d="M256 150 L256 362 M150 256 L362 256" stroke="white" stroke-width="30" stroke-linecap="round"/>
+  
+  <!-- Alert indicator -->
+  <path d="M256 100 L220 150 L292 150 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="4"/>
+  <circle cx="256" cy="130" r="10" fill="#78350f"/>
+</svg>

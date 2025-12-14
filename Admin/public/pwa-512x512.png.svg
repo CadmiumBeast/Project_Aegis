@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Green shield for HQ -->
+  <path d="M256 20 L50 100 L50 220 Q50 360 256 492 Q462 360 462 220 L462 100 Z" fill="#059669" stroke="#047857" stroke-width="8"/>
+  
+  <!-- Command center icon -->
+  <circle cx="256" cy="240" r="120" fill="#10b981" stroke="white" stroke-width="12"/>
+  <path d="M256 140 L256 340 M156 240 L356 240" stroke="white" stroke-width="25" stroke-linecap="round"/>
+  
+  <!-- Dashboard indicator -->
+  <rect x="176" y="350" width="160" height="90" rx="12" fill="#34d399" stroke="white" stroke-width="8"/>
+  <path d="M200 375 L230 375 M260 375 L290 375 M200 405 L290 405" stroke="#047857" stroke-width="8" stroke-linecap="round"/>
+</svg>

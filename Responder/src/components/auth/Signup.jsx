@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 function Signup({ switchToLogin, onSuccess }) {
   const [name, setName] = useState("");
@@ -20,6 +21,14 @@ function Signup({ switchToLogin, onSuccess }) {
       return;
     }
 
+    // Phone number validation
+    const phoneRegex = /^[0-9]{10}$/; // 10 digits
+    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    if (!phoneRegex.test(cleanPhone)) {
+      setError("Phone number must be exactly 10 digits");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -32,11 +41,32 @@ function Signup({ switchToLogin, onSuccess }) {
 
     try {
       setLoading(true);
-      await createUserWithEmailAndPassword(auth, email, password);
-      // TODO: Register responder with Laravel API
-      // await fetch('/api/responders/register', { name, phone, firebase_uid })
+      
+      // Create Firebase Auth account
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Update user profile with name
+      await updateProfile(user, {
+        displayName: name
+      });
+      
+      // Save user details to Firestore 'users' collection
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        name: name,
+        email: email,
+        phone: phone,
+        number: phone, // Also store as 'number' for compatibility
+        role: 'responder',
+        createdAt: new Date(),
+        lastLogin: new Date()
+      });
+      
+      console.log('✅ User profile created:', user.uid);
       onSuccess();
     } catch (err) {
+      console.error('Signup error:', err);
       setError(err.message || "Failed to create account");
     } finally {
       setLoading(false);
@@ -85,10 +115,16 @@ function Signup({ switchToLogin, onSuccess }) {
               <label style={styles.label}>Phone Number</label>
               <input
                 type="tel"
-                placeholder="Enter your phone number"
+                placeholder="10 digit phone number (e.g., 0771234567)"
                 style={styles.input}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  // Only allow digits
+                  const value = e.target.value.replace(/\D/g, '');
+                  if (value.length <= 10) {
+                    setPhone(value);
+                  }
+                }}
                 onFocus={(e) => {
                   e.target.style.border = "2px solid #8B2E2E";
                   e.target.style.boxShadow = "0 0 0 3px rgba(139, 46, 46, 0.1)";
@@ -98,7 +134,11 @@ function Signup({ switchToLogin, onSuccess }) {
                   e.target.style.boxShadow = "none";
                 }}
                 disabled={loading}
+                maxLength={10}
               />
+              <span style={styles.hint}>
+                {phone.length > 0 && `${phone.length}/10 digits`}
+              </span>
             </div>
 
             <div style={styles.inputGroup}>
@@ -335,6 +375,12 @@ const styles = {
     background: "#fee2e2",
     color: "#dc2626",
     border: "1px solid #fecaca",
+    fontWeight: "500",
+  },
+  hint: {
+    fontSize: "0.75rem",
+    color: "#8B2E2E",
+    marginTop: "0.25rem",
     fontWeight: "500",
   },
 };
