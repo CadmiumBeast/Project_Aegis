@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllReports, initDB } from "../../utils/indexedDB";
+import { collection, query, getDocs, where } from 'firebase/firestore';
+import { db, auth } from '../../firebase';
 import MapDisplay from "../MapDisplay";
 
 function PastReports() {
@@ -18,10 +20,45 @@ function PastReports() {
     const fetchReports = async () => {
       try {
         await initDB();
-        const allReports = await getAllReports();
+        
+        // Get local reports from IndexedDB
+        const localReports = await getAllReports();
+        console.log('📱 Local reports:', localReports.length);
+        
+        // Get synced reports from Firebase (if user is authenticated)
+        let firebaseReports = [];
+        if (auth.currentUser) {
+          try {
+            const reportsRef = collection(db, 'responderReports');
+            const q = query(reportsRef, where('responderID', '==', auth.currentUser.uid));
+            const snapshot = await getDocs(q);
+            
+            firebaseReports = snapshot.docs.map(doc => ({
+              id: 'firebase_' + doc.id,
+              ...doc.data(),
+              synced: true,
+              fromFirebase: true,
+            }));
+            console.log('☁️ Firebase reports:', firebaseReports.length);
+          } catch (firebaseError) {
+            console.warn('Could not fetch Firebase reports:', firebaseError);
+          }
+        }
+        
+        // Combine and deduplicate reports
+        const allReports = [...localReports, ...firebaseReports];
+        
+        // Sort by timestamp (newest first)
+        allReports.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+        
         setReports(allReports);
+        console.log('📊 Total reports:', allReports.length);
       } catch (error) {
-        // Error fetching reports handled silently
+        console.error('Error fetching reports:', error);
       } finally {
         setLoading(false);
       }

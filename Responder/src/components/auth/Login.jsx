@@ -3,7 +3,8 @@
 
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase";
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 function Login({ switchToSignup, onSuccess, isDarkMode }) {
   const [email, setEmail] = useState("");
@@ -22,7 +23,17 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
 
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Update last login timestamp in Firestore
+      try {
+        await updateDoc(doc(db, 'users', userCredential.user.uid), {
+          lastLogin: serverTimestamp()
+        });
+      } catch (updateError) {
+        console.warn('Could not update last login:', updateError);
+      }
+      
       onSuccess();
     } catch {
       setError("Invalid email or password");

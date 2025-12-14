@@ -158,6 +158,7 @@ export default function HQDashboard() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showNotification, setShowNotification] = useState(false);
   const [notificationIncident, setNotificationIncident] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [mapCenter, setMapCenter] = useState([6.6828, 80.4032]);
@@ -175,8 +176,31 @@ export default function HQDashboard() {
 
   // Get responder details by ID
   const getResponderDetails = (responderID) => {
-    if (!responderID) return { name: 'Unknown', number: 'N/A', email: 'N/A' };
-    return responders[responderID] || { name: 'Unknown', number: 'N/A', email: 'N/A' };
+    console.log('🔍 Looking up responder:', responderID);
+    console.log('📋 Available responders:', Object.keys(responders));
+    
+    if (!responderID || responderID === 'UNKNOWN' || responderID === 'anonymous') {
+      return { 
+        name: 'Anonymous Responder', 
+        number: 'Not provided', 
+        email: 'Not provided' 
+      };
+    }
+    
+    // Check if we have data from Firebase users collection
+    if (responders[responderID]) {
+      console.log('✅ Found responder data:', responders[responderID]);
+      return responders[responderID];
+    }
+    
+    console.log('⚠️ Responder not found in database, using fallback');
+    // Fallback: Create readable name from UID
+    const shortId = responderID.substring(0, 8);
+    return { 
+      name: `Responder ${shortId}`, 
+      number: 'Not provided', 
+      email: 'Not provided' 
+    };
   };
 
   // Parse timestamp in multiple formats
@@ -216,18 +240,21 @@ export default function HQDashboard() {
         const respondersData = {};
         snapshot.docs.forEach(doc => {
           const data = doc.data();
+          console.log('👤 User document:', doc.id, data);
           respondersData[doc.id] = {
             id: doc.id,
-            name: data.name || 'Unknown',
-            number: data.number || data.phone || 'N/A',
-            email: data.email || 'N/A',
+            name: data.name || data.displayName || 'Unknown',
+            number: data.phone || data.number || 'Not provided',
+            email: data.email || 'Not provided',
           };
         });
         setResponders(respondersData);
+        console.log('👥 Total responders loaded:', Object.keys(respondersData).length);
+        console.log('📊 Responders data:', respondersData);
       });
       return () => unsubscribe();
     } catch (error) {
-      console.error('Error fetching responders:', error);
+      console.error('❌ Error fetching responders:', error);
     }
   }, []);
 
@@ -238,8 +265,14 @@ export default function HQDashboard() {
       const q = query(incidentsRef, orderBy('timestamp', 'desc'));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
+        console.log('🔔 HQ Dashboard received update:', snapshot.docs.length, 'reports');
+        
         const fetchedIncidents = snapshot.docs.map(doc => {
           const data = doc.data();
+          console.log('📄 Report document ID:', doc.id);
+          console.log('📊 Report full data:', JSON.stringify(data, null, 2));
+          console.log('🔑 responderID field:', data.responderID);
+          
           const responderID = data.responderID || 'UNKNOWN';
           const responderData = getResponderDetails(responderID);
           
@@ -402,6 +435,9 @@ export default function HQDashboard() {
 
   const handleAcknowledge = async (incidentId) => {
     try {
+      // Find the incident
+      const incident = incidents.find(inc => inc.id === incidentId);
+      
       // Update local state immediately for UI feedback
       setIncidents(prev => prev.map(inc => 
         inc.id === incidentId 
@@ -421,8 +457,24 @@ export default function HQDashboard() {
         status: 'ACK',
         acknowledgedAt: new Date(),
       });
+      
+      // Show success toast
+      setToastMessage({
+        text: `${incident?.type || 'Incident'} acknowledged successfully`,
+        type: 'success'
+      });
+      setTimeout(() => setToastMessage(null), 4000);
+      
     } catch (error) {
       console.error('Failed to acknowledge incident:', error);
+      
+      // Show error toast
+      setToastMessage({
+        text: 'Failed to acknowledge incident. Please try again.',
+        type: 'error'
+      });
+      setTimeout(() => setToastMessage(null), 4000);
+      
       // Revert on error
       setIncidents(prev => prev.map(inc => 
         inc.id === incidentId 
@@ -458,6 +510,22 @@ export default function HQDashboard() {
 
   return (
     <div className="hq-dashboard">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`hq-toast ${toastMessage.type}`}>
+          <span className="toast-icon">
+            {toastMessage.type === 'success' ? '✓' : '✕'}
+          </span>
+          <span className="toast-text">{toastMessage.text}</span>
+          <button 
+            className="toast-close"
+            onClick={() => setToastMessage(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="dashboard-header">
         <div className="header-left">

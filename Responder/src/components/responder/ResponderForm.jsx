@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { saveReport, initDB, getUnsyncedReports, deleteReport, clearAllReports } from "../../utils/indexedDB";
+import { saveReport, initDB, getUnsyncedReports, markAsSynced, clearAllReports } from "../../utils/indexedDB";
 import MapDisplay from "../MapDisplay";
 // 1. Import Storage references
 import { db, storage, auth } from "../../firebase"; 
 import { collection, addDoc } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { signInAnonymously } from "firebase/auth";
 
 function ResponderForm() {
   const [formData, setFormData] = useState({
@@ -25,20 +24,77 @@ function ResponderForm() {
   const [transcript, setTranscript] = useState("");
   const [voiceLanguage, setVoiceLanguage] = useState('en-US');
   const [interimText, setInterimText] = useState('');
+  const [notification, setNotification] = useState(null);
+  const [lastNotificationMessage, setLastNotificationMessage] = useState('');
   const recognitionRef = useRef(null);
   const restartTimeoutRef = useRef(null);
+  const notificationTimeoutRef = useRef(null);
   const navigate = useNavigate();
+
+  // Notification system - prevents duplicates and auto-dismisses
+  const showNotification = (message, type = 'success') => {
+    // Prevent duplicate notifications
+    if (message === lastNotificationMessage) {
+      return;
+    }
+    
+    setLastNotificationMessage(message);
+    setNotification({ message, type });
+    
+    // Clear previous timeout
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    
+    // Auto-dismiss after 4 seconds
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+      setLastNotificationMessage('');
+    }, 4000);
+  };
 
   useEffect(() => {
     initDB();
-    console.log(auth.currentUser);
-    // Sign in anonymously if not already signed in
+    
+    // Check if user is logged in (required for responders)
     if (!auth.currentUser) {
-      signInAnonymously(auth)
-        .catch((error) => {
-          // Failed to sign in anonymously
-        });
+      console.log('⚠️ No user logged in - responder must be authenticated');
+      showNotification('Please log in to submit reports', 'warning');
+      return;
     }
+    
+    console.log('👤 Logged in as:', auth.currentUser.displayName || auth.currentUser.email);
+    
+    // Ensure user profile exists in Firestore
+    const ensureUserProfile = async () => {
+      try {
+        const { doc, getDoc, setDoc } = await import('firebase/firestore');
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          console.log('⚠️ User profile not found, creating one...');
+          // Create a basic profile if it doesn't exist
+          await setDoc(userRef, {
+            uid: auth.currentUser.uid,
+            name: auth.currentUser.displayName || 'Responder',
+            email: auth.currentUser.email || 'No email',
+            phone: 'Not provided',
+            number: 'Not provided',
+            role: 'responder',
+            createdAt: new Date(),
+            lastLogin: new Date()
+          });
+          console.log('✅ User profile created');
+        } else {
+          console.log('✅ User profile exists:', userSnap.data());
+        }
+      } catch (error) {
+        console.error('Error ensuring user profile:', error);
+      }
+    };
+    
+    ensureUserProfile();
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -96,7 +152,7 @@ function ResponderForm() {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = voiceLanguage;
-    recognition.maxAlternatives = 3; // Get multiple interpretations
+    recognition.maxAlternatives = 5; // Get more interpretations for better accuracy
 
     recognition.onstart = () => {
       console.log('Voice recognition started');
@@ -142,10 +198,10 @@ function ResponderForm() {
       }
       
       if (event.error === 'audio-capture') {
-        alert('Microphone not accessible. Please check permissions.');
+        showNotification('Microphone not accessible. Please check permissions.', 'error');
         setIsListening(false);
       } else if (event.error === 'not-allowed') {
-        alert('Microphone access denied. Please grant permissions.');
+        showNotification('Microphone access denied. Please grant permissions.', 'error');
         setIsListening(false);
       } else {
         // For other errors, try to restart
@@ -187,51 +243,77 @@ function ResponderForm() {
     console.log('Processing command:', command);
 
     let commandProcessed = false;
+    let updateMessage = '';
 
-    // Multilingual Incident Type Detection
-    // English + Sinhala + Tamil
-    if (lowerCommand.match(/landslide|භූමිෂ්ථර|நிலச்சரிவு/i)) {
+    // ENHANCED Multilingual Incident Type Detection
+    // English + Sinhala + Tamil with natural variations
+    if (lowerCommand.match(/landslide|land slide|mud slide|mudslide|mountain fall|hill collapse|පස් කන්ද|භූමි ඇද වැටීම|කන්ද කඩා වැටීම|மலை சரிவு|நிலச்சரிவு|மண் சரிவு/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Landslide' }));
+      updateMessage = 'Landslide selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/flood|ගංවතුර|வெள்ளம்/i)) {
+    } else if (lowerCommand.match(/flood|flooding|water|overflow|river|ගංවතුර|ජල ගැලීම|පාත|வெள்ளம்|நீர் வெள்ளம்|ஆற்று வெள்ளம்/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Flood' }));
+      updateMessage = 'Flood selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/road block|roadblock|මාර්ග අවහිරතා|சாலை தடை/i)) {
+    } else if (lowerCommand.match(/road block|roadblock|road blocked|tree fall|tree down|obstacle|මාර්ග අවහිරතා|මාර්ගය අවහිර|ගස වැටී|சாலை தடை|சாலை அடைப்பு|மரம் விழுந்தது/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Road Block' }));
+      updateMessage = 'Road Block selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/power line|powerline|විදුලි රැහැන්|மின்சார கம்பி/i)) {
+    } else if (lowerCommand.match(/power line|powerline|electricity|electric line|cable down|wire down|විදුලි රැහැන්|විදුලි රැහැන් කඩා|කේබලය|மின் கம்பி|மின்சார கம்பி|கம்பி விழுந்தது/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Power Line Down' }));
+      updateMessage = 'Power Line Down selected';
       commandProcessed = true;
     }
 
-    // Multilingual Severity Detection
-    if (lowerCommand.match(/critical|තීව්‍ර|முக்கியமான|severity 5|level 5/i)) {
+    // ENHANCED Multilingual Severity Detection with natural language
+    if (lowerCommand.match(/critical|very dangerous|emergency|urgent|worst|severe|තීව්‍ර|ඉතා භයානක|හදිසි|முக்கியமான|மிக ஆபத்தான|அவசரம்|5|five/i)) {
       setFormData(prev => ({ ...prev, severity: '5' }));
+      updateMessage = updateMessage ? updateMessage + ' - Critical severity' : 'Critical severity set';
       commandProcessed = true;
-    } else if (lowerCommand.match(/high|ඉහළ|உயர்|severity 4|level 4/i)) {
+    } else if (lowerCommand.match(/high|dangerous|bad situation|serious|ඉහළ|භයානක|උயர්|நெருக்கடி|ஆபத்தான|4|four/i)) {
       setFormData(prev => ({ ...prev, severity: '4' }));
+      updateMessage = updateMessage ? updateMessage + ' - High severity' : 'High severity set';
       commandProcessed = true;
-    } else if (lowerCommand.match(/medium|මධ්‍යම|நடுத்தர|severity 3|level 3/i)) {
+    } else if (lowerCommand.match(/medium|moderate|average|normal|මධ්‍යම|සාමාන්‍ය|நடுத்தர|சாதாரண|3|three/i)) {
       setFormData(prev => ({ ...prev, severity: '3' }));
+      updateMessage = updateMessage ? updateMessage + ' - Medium severity' : 'Medium severity set';
       commandProcessed = true;
-    } else if (lowerCommand.match(/low|අඩු|குறைந்த|severity 2|level 2/i)) {
+    } else if (lowerCommand.match(/low|minor|small|not serious|අඩු|සුළු|குறைவான|சிறிய|2|two/i)) {
       setFormData(prev => ({ ...prev, severity: '2' }));
+      updateMessage = updateMessage ? updateMessage + ' - Low severity' : 'Low severity set';
       commandProcessed = true;
-    } else if (lowerCommand.match(/minimal|අවම|குறைந்தபட்ச|severity 1|level 1/i)) {
+    } else if (lowerCommand.match(/minimal|very low|tiny|negligible|අවම|ඉතා අඩු|குறைந்தபட்ச|மிக குறைவு|1|one/i)) {
       setFormData(prev => ({ ...prev, severity: '1' }));
+      updateMessage = updateMessage ? updateMessage + ' - Minimal severity' : 'Minimal severity set';
       commandProcessed = true;
+    }
+
+    // Clear command - multilingual
+    if (lowerCommand.match(/clear description|delete description|remove description|විස්තරය මකන්න|விளக்கத்தை அழி/i)) {
+      setFormData(prev => ({ ...prev, description: '' }));
+      updateMessage = 'Description cleared';
+      commandProcessed = true;
+    }
+
+    // Show feedback for recognized commands
+    if (updateMessage) {
+      setTranscript(updateMessage);
+      setTimeout(() => setTranscript(''), 3000);
     }
 
     // Description append (only if not a control command)
-    if (!lowerCommand.match(/submit|save|ඉදිරිපත්|சமர்ப்பிக்க/i) && !commandProcessed) {
+    if (!lowerCommand.match(/submit|save|clear|ඉදිරිපත්|සුරකින්න|මකන්න|சமர்ப்பிக்க|சேமி|அழி|landslide|flood|road|power|critical|high|medium|low|minimal|severity|level/i) && !commandProcessed) {
       setFormData(prev => ({ 
         ...prev, 
         description: prev.description ? `${prev.description} ${command}` : command 
       }));
+      setTranscript('Added to description');
+      setTimeout(() => setTranscript(''), 2000);
     }
 
     // Submit command (multilingual)
-    if (lowerCommand.match(/submit report|save report|වාර්තාව ඉදිරිපත්|அறிக்கை சமர்ப்பிக்க/i)) {
+    if (lowerCommand.match(/submit report|submit|save report|send report|වාර්තාව යවන්න|වාර්තාව ඉදිරිපත්|அறிக்கையை அனுப்பு|சமர்ப்பிக்க/i)) {
+      setTranscript('Submitting report...');
       setTimeout(() => {
         document.querySelector('form')?.requestSubmit();
       }, 500);
@@ -240,7 +322,7 @@ function ResponderForm() {
 
   const toggleVoiceInput = () => {
     if (!recognitionRef.current) {
-      alert('Voice recognition not supported in this browser. Try Chrome, Edge, or Safari.');
+      showNotification('Voice recognition not supported. Please use Chrome, Edge, or Safari.', 'error');
       return;
     }
 
@@ -258,7 +340,7 @@ function ResponderForm() {
         setIsListening(true);
       } catch (e) {
         console.error('Could not start recognition:', e);
-        alert('Could not start voice recognition. Please check microphone permissions.');
+        showNotification('Could not start voice recognition. Check microphone permissions.', 'error');
       }
     }
   };
@@ -270,12 +352,36 @@ function ResponderForm() {
     }
   }, [voiceLanguage, isListening]);
 
+  // Get language-specific hints
+  const getVoiceHints = () => {
+    switch(voiceLanguage) {
+      case 'si-LK':
+        return 'උදා: "ගංවතුර", "ඉතා භයානක", "වාර්තාව යවන්න"';
+      case 'ta-LK':
+        return 'எ.கா: "வெள்ளம்", "மிக ஆபத்தான", "அறிக்கையை அனுப்பு"';
+      default:
+        return 'Say: "Flood", "Critical", "Submit report"';
+    }
+  };
+
+  const getListeningText = () => {
+    switch(voiceLanguage) {
+      case 'si-LK':
+        return 'ඇසුරුම් කරයි...';
+      case 'ta-LK':
+        return 'கேட்கிறது...';
+      default:
+        return 'Listening...';
+    }
+  };
+
   // --- THE FIXED SYNC FUNCTION ---
   const syncDataToAPI = async () => {
     if (isSyncing) return; // Prevent double syncs
     
     try {
       const unsyncedReports = await getUnsyncedReports();
+      console.log('📤 Attempting to sync:', unsyncedReports.length, 'reports');
       
       if (unsyncedReports.length === 0) {
         return;
@@ -324,22 +430,25 @@ function ResponderForm() {
           }
           
           const docRef = await addDoc(reportsCollection, reportData);
+          console.log('✅ Report synced to Firebase:', docRef.id);
 
-          // 3. Delete from Local IndexedDB only after success
-          await deleteReport(report.id);
+          // 3. Mark as synced in IndexedDB (don't delete so it shows in Past Reports)
+          await markAsSynced(report.id);
           syncedCount++;
 
         } catch (innerErr) {
+          console.error('❌ Failed to sync report:', report.id, innerErr);
           // Continue to the next report even if one fails
         }
       }
 
       if (syncedCount > 0) {
-        alert(`✅ ${syncedCount} report(s) synced to server!`);
+        showNotification(`${syncedCount} report${syncedCount > 1 ? 's' : ''} synced to HQ successfully`, 'success');
       }
       
     } catch (err) {
-      // Sync error
+      console.error('Sync error:', err);
+      showNotification('Failed to sync reports. Will retry when online.', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -352,11 +461,12 @@ function ResponderForm() {
     setIsClearing(true);
     try {
       await clearAllReports();
-      alert("✅ All local reports cleared!");
+      showNotification('All local reports cleared successfully', 'success');
       // Reset form
       setFormData({ incidentType: "", severity: "3", description: "", photo: null, latitude: null, longitude: null });
     } catch (err) {
-      alert("❌ Error clearing database: " + err.message);
+      console.error('Clear error:', err);
+      showNotification('Failed to clear local storage', 'error');
     } finally {
       setIsClearing(false);
     }
@@ -378,7 +488,7 @@ function ResponderForm() {
     e.preventDefault();
     
     if (!formData.incidentType) {
-      alert("Please select an incident type");
+      showNotification('Please select an incident type', 'warning');
       return;
     }
     
@@ -410,17 +520,21 @@ function ResponderForm() {
 
       saveReport(newReport)
         .then((id) => {
-          alert(isOnline ? "✅ Report saved! Syncing to server..." : "✅ Report saved locally! Will sync when online.");
+          console.log('💾 Report saved to IndexedDB with ID:', id);
+          
+          if (isOnline) {
+            showNotification('Report saved! Syncing to HQ...', 'success');
+            // Trigger sync immediately if online
+            syncDataToAPI();
+          } else {
+            showNotification('Report saved locally. Will sync when connection restored.', 'info');
+          }
           // Reset form
           setFormData({ incidentType: "", severity: "3", description: "", photo: null, latitude: formData.latitude, longitude: formData.longitude });
-          
-          // Trigger sync immediately if online
-          if (isOnline) {
-            syncDataToAPI();
-          }
         })
         .catch(err => { 
-            alert("❌ Failed to save report: " + err.message); 
+            console.error('Save error:', err);
+            showNotification('Failed to save report. Please try again.', 'error'); 
         });
     });
   };
@@ -428,6 +542,29 @@ function ResponderForm() {
 
   return (
     <div style={styles.screen} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* Toast Notification */}
+      {notification && (
+        <div style={{
+          ...styles.notification,
+          backgroundColor: notification.type === 'success' ? '#10b981' : 
+                          notification.type === 'error' ? '#ef4444' : 
+                          notification.type === 'warning' ? '#f59e0b' : '#3b82f6'
+        }}>
+          <span style={styles.notificationIcon}>
+            {notification.type === 'success' ? '✓' : 
+             notification.type === 'error' ? '✕' : 
+             notification.type === 'warning' ? '⚠' : 'ℹ'}
+          </span>
+          <span style={styles.notificationText}>{notification.message}</span>
+          <button 
+            onClick={() => setNotification(null)}
+            style={styles.notificationClose}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      
       <div style={styles.container}>
         <div style={styles.card}>
           {/* Online/Offline Symbol */}
@@ -437,6 +574,16 @@ function ResponderForm() {
             <div style={styles.icon}>🚨</div>
             <h1 style={styles.title}>Incident Report</h1>
             <p style={styles.subtitle}>Field responder submission</p>
+            
+            {/* User Info Display */}
+            {auth.currentUser && (
+              <div style={styles.userInfo}>
+                <span style={styles.userIcon}>👤</span>
+                <span style={styles.userName}>
+                  {auth.currentUser.displayName || auth.currentUser.email}
+                </span>
+              </div>
+            )}
             
             {/* Voice Input Controls */}
             <div style={styles.voiceControls}>
@@ -460,19 +607,25 @@ function ResponderForm() {
                   animation: isListening ? 'pulse 1.5s infinite' : 'none'
                 }}
               >
-                {isListening ? '🎙️ Listening...' : '🎙️ Voice Input'}
+                {isListening ? `🎙️ ${getListeningText()}` : '🎙️ Voice Input'}
               </button>
             </div>
             
             {isListening && (
               <div style={styles.voiceIndicator}>
                 <p style={styles.voiceTranscript}>
-                  {interimText ? <span style={{opacity: 0.6}}>{interimText}</span> : transcript || 'Speak now...'}
+                  {interimText ? (
+                    <span style={{opacity: 0.6, fontStyle: 'italic'}}>🎤 {interimText}</span>
+                  ) : transcript ? (
+                    <span style={{color: '#10b981', fontWeight: 'bold'}}>✓ {transcript}</span>
+                  ) : (
+                    <span style={{opacity: 0.7}}>Speak now...</span>
+                  )}
                 </p>
                 <p style={styles.voiceHint}>
-                  Say: "Landslide", "Critical severity", "Submit report"
+                  {getVoiceHints()}
                 </p>
-                <p style={styles.voiceStatus}>🎤 Microphone active - Continuous listening</p>
+                <p style={styles.voiceStatus}>🎤 Microphone active - Continuous listening mode</p>
               </div>
             )}
           </div>
@@ -612,6 +765,25 @@ const styles = {
   icon: { fontSize: "3rem", marginBottom: "0.5rem", textShadow: "0 0 6px #000" },
   title: { fontSize: "2rem", fontWeight: "700", color: "#8B2E2E" },
   subtitle: { fontSize: "0.9rem", color: "#333", opacity: 0.8 },
+  userInfo: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
+    marginTop: "0.75rem",
+    padding: "0.5rem 1rem",
+    background: "linear-gradient(135deg, #f0f9ff, #e0f2fe)",
+    borderRadius: "20px",
+    border: "2px solid #8B2E2E",
+  },
+  userIcon: {
+    fontSize: "1.2rem",
+  },
+  userName: {
+    fontSize: "0.9rem",
+    fontWeight: "600",
+    color: "#8B2E2E",
+  },
   syncText: { fontSize: "0.8rem", color: "#555", fontStyle: "italic", textAlign: "center", marginBottom: "1rem" },
   form: { display: "flex", flexDirection: "column", gap: "1.5rem" },
   inputGroup: { display: "flex", flexDirection: "column", gap: "0.5rem" },
@@ -762,15 +934,62 @@ const styles = {
     color: '#059669',
     fontWeight: '600',
     marginTop: '0.5rem',
+  },
+  notification: {
+    position: 'fixed',
+    top: '20px',
+    right: '20px',
+    left: '20px',
+    maxWidth: '500px',
+    margin: '0 auto',
+    padding: '1rem 1.5rem',
+    borderRadius: '12px',
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: '0.95rem',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+    zIndex: 9999,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    animation: 'slideDown 0.3s ease',
+  },
+  notificationIcon: {
+    fontSize: '1.2rem',
+    fontWeight: '700',
+  },
+  notificationText: {
+    flex: 1,
+  },
+  notificationClose: {
+    background: 'transparent',
+    border: 'none',
+    color: '#fff',
+    fontSize: '1.2rem',
+    cursor: 'pointer',
+    padding: '0',
+    opacity: 0.8,
+    transition: 'opacity 0.2s',
   }
 };
 
-// Add pulse animation
+// Add pulse and slideDown animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
+  }
+  
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
 `;
 document.head.appendChild(styleSheet);

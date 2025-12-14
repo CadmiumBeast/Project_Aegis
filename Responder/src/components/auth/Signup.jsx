@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../firebase";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../../firebase";
 
 function Signup({ switchToLogin, onSuccess }) {
   const [name, setName] = useState("");
@@ -32,11 +33,32 @@ function Signup({ switchToLogin, onSuccess }) {
 
     try {
       setLoading(true);
-      await createUserWithEmailAndPassword(auth, email, password);
-      // TODO: Register responder with Laravel API
-      // await fetch('/api/responders/register', { name, phone, firebase_uid })
+      
+      // Create Firebase Auth account
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Update user profile with name
+      await updateProfile(user, {
+        displayName: name
+      });
+      
+      // Save user details to Firestore 'users' collection
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        name: name,
+        email: email,
+        phone: phone,
+        number: phone, // Also store as 'number' for compatibility
+        role: 'responder',
+        createdAt: new Date(),
+        lastLogin: new Date()
+      });
+      
+      console.log('✅ User profile created:', user.uid);
       onSuccess();
     } catch (err) {
+      console.error('Signup error:', err);
       setError(err.message || "Failed to create account");
     } finally {
       setLoading(false);
