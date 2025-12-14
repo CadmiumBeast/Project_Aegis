@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveReport, initDB, getUnsyncedReports, markAsSynced, clearAllReports } from "../../utils/indexedDB";
 import MapDisplay from "../MapDisplay";
+import { translations } from "../../utils/translations";
 // 1. Import Storage references
 import { db, storage, auth } from "../../firebase"; 
 import { collection, addDoc } from "firebase/firestore";
@@ -22,7 +23,14 @@ function ResponderForm() {
   const [touchStartY, setTouchStartY] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [voiceLanguage, setVoiceLanguage] = useState('en-US');
+  const [uiLanguage, setUiLanguage] = useState(() => {
+    // Load saved language preference or default to 'en'
+    return localStorage.getItem('aegis_ui_language') || 'en';
+  });
+  const [voiceLanguage, setVoiceLanguage] = useState(() => {
+    // Load saved voice language preference or default to 'en-US'
+    return localStorage.getItem('aegis_voice_language') || 'en-US';
+  });
   const [interimText, setInterimText] = useState('');
   const [notification, setNotification] = useState(null);
   const [lastNotificationMessage, setLastNotificationMessage] = useState('');
@@ -34,6 +42,18 @@ function ResponderForm() {
   const notificationTimeoutRef = useRef(null);
   const retryTimeoutRef = useRef(null);
   const navigate = useNavigate();
+
+  // Save language preferences to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('aegis_ui_language', uiLanguage);
+  }, [uiLanguage]);
+
+  useEffect(() => {
+    localStorage.setItem('aegis_voice_language', voiceLanguage);
+  }, [voiceLanguage]);
+
+  // Get translations for current UI language
+  const t = translations[uiLanguage] || translations.en;
 
   // Notification system - prevents duplicates and auto-dismisses
   const showNotification = (message, type = 'success') => {
@@ -254,29 +274,36 @@ function ResponderForm() {
 
   const processVoiceCommand = (command) => {
     const lowerCommand = command.toLowerCase();
-    console.log('Processing command:', command);
+    console.log('🎤 Processing command:', command);
+    console.log('🔍 Lowercase version:', lowerCommand);
 
     let commandProcessed = false;
     let updateMessage = '';
 
-    // ENHANCED Multilingual Incident Type Detection
-    // English + Sinhala + Tamil with natural variations
-    if (lowerCommand.match(/landslide|land slide|mud slide|mudslide|mountain fall|hill collapse|පස් කන්ද|භූමි ඇද වැටීම|කන්ද කඩා වැටීම|மலை சரிவு|நிலச்சரிவு|மண் சரிவு/i)) {
+    // ENHANCED Multilingual Incident Type Detection with flexible spacing
+    // English + Sinhala + Tamil with natural variations and spacing flexibility
+    if (lowerCommand.match(/landslide|land\s*slide|mud\s*slide|mudslide|mountain\s*fall|hill\s*collapse|පස්\s*කන්ද|භූමි\s*ඇද\s*වැටීම|කන්ද\s*කඩා\s*වැටීම|மலை\s*சரிவு|நிலச்\s*சரிவு|நிலச்சரிவு|மண்\s*சரிவு/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Landslide' }));
-      updateMessage = 'Landslide selected';
+      updateMessage = '✅ Landslide selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/flood|flooding|water|overflow|river|ගංවතුර|ජල ගැලීම|පාත|வெள்ளம்|நீர் வெள்ளம்|ஆற்று வெள்ளம்/i)) {
+      console.log('✅ MATCHED: Landslide');
+    } else if (lowerCommand.match(/flood|flooding|water\s*logging|overflow|river\s*flood|ගංවතුර|ජල\s*ගැලීම|පාත|வெள்ளம்|வெள்\s*ளம்|நீர்\s*வெள்ளம்|ஆற்று\s*வெள்ளம்|வெல்லம்|வெல்\s*லம்/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Flood' }));
-      updateMessage = 'Flood selected';
+      updateMessage = '✅ Flood selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/road block|roadblock|road blocked|tree fall|tree down|obstacle|මාර්ග අවහිරතා|මාර්ගය අවහිර|ගස වැටී|சாலை தடை|சாலை அடைப்பு|மரம் விழுந்தது/i)) {
+      console.log('✅ MATCHED: Flood');
+    } else if (lowerCommand.match(/road\s*block|roadblock|road\s*blocked|tree\s*fall|tree\s*down|obstacle|block|මාර්ග\s*අවහිරතා|මාර්ගය\s*අවහිර|ගස\s*වැටී|சாலை\s*தடை|சாலை\s*அடைப்பு|மரம்\s*விழுந்தது|சாலைதடை/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Road Block' }));
-      updateMessage = 'Road Block selected';
+      updateMessage = '✅ Road Block selected';
       commandProcessed = true;
-    } else if (lowerCommand.match(/power line|powerline|electricity|electric line|cable down|wire down|විදුලි රැහැන්|විදුලි රැහැන් කඩා|කේබලය|மின் கம்பி|மின்சார கம்பி|கம்பி விழுந்தது/i)) {
+      console.log('✅ MATCHED: Road Block');
+    } else if (lowerCommand.match(/power\s*line|powerline|electricity|electric\s*line|cable\s*down|wire\s*down|විදුලි\s*රැහැන්|විදුලි\s*රැහැන්\s*කඩා|කේබලය|மின்\s*கம்பி|மின்சார\s*கம்பி|கம்பி\s*விழுந்தது|மின்கம்பி/i)) {
       setFormData(prev => ({ ...prev, incidentType: 'Power Line Down' }));
-      updateMessage = 'Power Line Down selected';
+      updateMessage = '✅ Power Line Down selected';
       commandProcessed = true;
+      console.log('✅ MATCHED: Power Line Down');
+    } else {
+      console.log('❌ No incident type matched');
     }
 
     // ENHANCED Multilingual Severity Detection with natural language
@@ -639,18 +666,38 @@ function ResponderForm() {
               </div>
             )}
             
+            {/* Language Controls */}
+            <div style={styles.languageControlsWrapper}>
+              <div style={styles.languageControl}>
+                <label style={styles.miniLabel}>Display Language</label>
+                <select 
+                  value={uiLanguage} 
+                  onChange={(e) => setUiLanguage(e.target.value)}
+                  style={styles.miniSelect}
+                >
+                  <option value="en">🇬🇧 English</option>
+                  <option value="si">සිං Sinhala</option>
+                  <option value="ta">த Tamil</option>
+                </select>
+              </div>
+              
+              <div style={styles.languageControl}>
+                <label style={styles.miniLabel}>{t.voiceLanguage}</label>
+                <select 
+                  value={voiceLanguage} 
+                  onChange={(e) => setVoiceLanguage(e.target.value)}
+                  style={styles.miniSelect}
+                  disabled={isListening}
+                >
+                  <option value="en-US">🇬🇧 English</option>
+                  <option value="si-LK">සිං Sinhala</option>
+                  <option value="ta-LK">த Tamil</option>
+                </select>
+              </div>
+            </div>
+            
             {/* Voice Input Controls */}
             <div style={styles.voiceControls}>
-              <select 
-                value={voiceLanguage} 
-                onChange={(e) => setVoiceLanguage(e.target.value)}
-                style={styles.languageSelect}
-                disabled={isListening}
-              >
-                <option value="en-US">🇬🇧 English</option>
-                <option value="si-LK">🇱🇰 සිංහල (Sinhala)</option>
-                <option value="ta-LK">🇱🇰 தமிழ் (Tamil)</option>
-              </select>
               
               <button 
                 type="button"
@@ -661,7 +708,7 @@ function ResponderForm() {
                   animation: isListening ? 'pulse 1.5s infinite' : 'none'
                 }}
               >
-                {isListening ? `🎙️ ${getListeningText()}` : '🎙️ Voice Input'}
+                {isListening ? `🎙️ ${t.listening}` : `🎙️ ${t.startListening}`}
               </button>
             </div>
             
@@ -693,18 +740,18 @@ function ResponderForm() {
 
           <form style={styles.form} onSubmit={handleSubmit}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Incident Type</label>
+              <label style={styles.label}>{t.incidentType}</label>
               <select name="incidentType" value={formData.incidentType} onChange={handleChange} required style={styles.input}>
-                <option value="">Select incident</option>
-                <option value="Landslide">Landslide</option>
-                <option value="Flood">Flood</option>
-                <option value="Road Block">Road Block</option>
-                <option value="Power Line Down">Power Line Down</option>
+                <option value="">{t.selectIncident}</option>
+                <option value="Landslide">{t.landslide}</option>
+                <option value="Flood">{t.flood}</option>
+                <option value="Road Block">{t.roadBlock}</option>
+                <option value="Power Line Down">{t.powerLineDown}</option>
               </select>
             </div>
 
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Severity Level</label>
+              <label style={styles.label}>{t.severity}</label>
               <div style={styles.severityGrid}>
                 {["1","2","3","4","5"].map(level => {
                   let bgColor = "#fff";
@@ -730,12 +777,12 @@ function ResponderForm() {
             </div>
 
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Description (optional)</label>
-              <textarea rows={4} placeholder="Hazards, landmarks, notes…" name="description" value={formData.description} onChange={handleChange} style={styles.textarea} />
+              <label style={styles.label}>{t.description}</label>
+              <textarea rows={4} placeholder={t.descriptionPlaceholder} name="description" value={formData.description} onChange={handleChange} style={styles.textarea} />
             </div>
 
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Photo (optional)</label>
+              <label style={styles.label}>{t.capturePhoto}</label>
               <div style={styles.photoInputContainer}>
                 <input type="file" name="photo" accept="image/*" onChange={handleChange} style={styles.photoInput} />
                 {formData.photo ? (
@@ -745,12 +792,12 @@ function ResponderForm() {
                     style={styles.imagePreviewInside} 
                   />
                 ) : (
-                  <span style={styles.photoPlaceholder}>Choose photo</span>
+                  <span style={styles.photoPlaceholder}>{t.capturePhoto}</span>
                 )}
               </div>
             </div>
 
-            <button type="submit" style={styles.button}>Save Report</button>
+            <button type="submit" style={styles.button}>{t.submit}</button>
           </form>
 {/* 
           <button 
@@ -767,7 +814,7 @@ function ResponderForm() {
     type="button"
     onClick={() => navigate("/pending-reports")}
     style={{ ...styles.button, flex: 1, background: "#8B2E2E", fontSize: "0.85rem" }}
-  >Pending Reports
+  >{t.pendingReports}
   </button>
 
   {/* Button to view past reports */}
@@ -775,7 +822,7 @@ function ResponderForm() {
     type="button"
     onClick={() => navigate("/past-reports")}
     style={{ ...styles.button, flex: 1, background: "#8B2E2E", fontSize: "0.85rem"  }}
-  >Past Reports
+  >{t.pastReports}
   </button>
 </div>
 
@@ -940,6 +987,35 @@ const styles = {
     gap: '0.5rem',
     alignItems: 'center',
   },
+  languageControlsWrapper: {
+    marginTop: '1rem',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '0.75rem',
+  },
+  languageControl: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+  },
+  miniLabel: {
+    fontSize: '0.7rem',
+    color: '#8B2E2E',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  miniSelect: {
+    padding: '0.5rem',
+    borderRadius: '8px',
+    border: '2px solid #8B2E2E',
+    background: '#fff',
+    color: '#8B2E2E',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    outline: 'none',
+  },
   languageSelect: {
     padding: '0.75rem',
     borderRadius: '12px',
@@ -954,7 +1030,7 @@ const styles = {
   voiceButton: {
     flex: 1,
     padding: '0.75rem 1.5rem',
-    borderRadius: '25px',
+    borderRadius: '15px',
     border: 'none',
     color: '#fff',
     fontWeight: '700',

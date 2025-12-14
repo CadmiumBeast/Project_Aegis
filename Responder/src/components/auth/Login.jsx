@@ -1,12 +1,9 @@
-
-// export default Login;
-
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 
-function Login({ switchToSignup, onSuccess, isDarkMode }) {
+function Login({ switchToSignup, onSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,8 +39,6 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
     }
   };
 
-  const styles = isDarkMode ? dark : light;
-
   return (
     <div style={styles.screen}>
       <div style={styles.container}>
@@ -71,10 +66,11 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onFocus={(e) => {
-                  Object.assign(e.target.style, styles.inputFocus || {});
+                  e.target.style.border = "2px solid #8B2E2E";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(139, 46, 46, 0.1)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.border = styles.input.border;
+                  e.target.style.border = "2px solid #e0e0e0";
                   e.target.style.boxShadow = 'none';
                 }}
                 disabled={loading}
@@ -90,10 +86,11 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={(e) => {
-                  Object.assign(e.target.style, styles.inputFocus || {});
+                  e.target.style.border = "2px solid #8B2E2E";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(139, 46, 46, 0.1)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.border = styles.input.border;
+                  e.target.style.border = "2px solid #e0e0e0";
                   e.target.style.boxShadow = 'none';
                 }}
                 disabled={loading}
@@ -109,14 +106,15 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
               disabled={loading}
               onMouseEnter={(e) => {
                 if (!loading) {
-                  Object.assign(e.target.style, styles.buttonHover || {});
+                  e.target.style.background = "#A03A3A";
+                  e.target.style.boxShadow = "0 6px 16px rgba(139, 46, 46, 0.4)";
                   e.target.style.transform = 'translateY(-1px)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!loading) {
-                  e.target.style.background = styles.button.background;
-                  e.target.style.boxShadow = styles.button.boxShadow;
+                  e.target.style.background = "#8B2E2E";
+                  e.target.style.boxShadow = "0 4px 12px rgba(139, 46, 46, 0.3)";
                   e.target.style.transform = 'translateY(0)';
                 }
               }}
@@ -132,10 +130,11 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
               style={styles.link} 
               onClick={switchToSignup}
               onMouseEnter={(e) => {
-                Object.assign(e.target.style, styles.linkHover || {});
+                e.target.style.color = "#A03A3A";
+                e.target.style.textDecoration = "underline";
               }}
               onMouseLeave={(e) => {
-                e.target.style.color = styles.link.color;
+                e.target.style.color = "#8B2E2E";
                 e.target.style.textDecoration = 'none';
               }}
             >
@@ -152,7 +151,7 @@ function Login({ switchToSignup, onSuccess, isDarkMode }) {
    MOBILE-FIRST BASE STYLES
 ========================= */
 
-const base = {
+const styles = {
   screen: {
     minHeight: "100svh",
     display: "flex",
@@ -268,83 +267,9 @@ const base = {
     border: "1px solid #fecaca",
     fontWeight: "500",
   },
-};
-
-/* LIGHT THEME - Matching HQ Admin Theme */
-const light = {
-  ...base,
-  input: {
-    ...base.input,
-    background: "#fff",
-    border: "2px solid #e0e0e0",
-    color: "#213547",
-  },
-  inputFocus: {
-    border: "2px solid #8B2E2E",
-    boxShadow: "0 0 0 3px rgba(139, 46, 46, 0.1)",
-  },
-  button: {
-    ...base.button,
-    background: "#8B2E2E",
-    color: "#fff",
-  },
-  buttonHover: {
-    background: "#A03A3A",
-    boxShadow: "0 6px 16px rgba(139, 46, 46, 0.4)",
-  },
   buttonDisabled: {
     opacity: 0.6,
     cursor: "not-allowed",
-  },
-  link: { 
-    ...base.link, 
-    color: "#8B2E2E",
-  },
-  linkHover: {
-    color: "#A03A3A",
-    textDecoration: "underline",
-  },
-};
-
-/* DARK THEME - Keeping dark theme but with admin colors */
-const dark = {
-  ...base,
-  screen: {
-    ...base.screen,
-    background: "linear-gradient(135deg, #8B2E2E 0%, #A03A3A 100%)",
-  },
-  card: {
-    ...base.card,
-    background: "#1a1a1a",
-    border: "1px solid #333",
-  },
-  title: { ...base.title, color: "#8B2E2E" },
-  subtitle: { ...base.subtitle, color: "#aaa" },
-  label: { ...base.label, color: "#ccc" },
-  input: {
-    ...base.input,
-    background: "#121212",
-    border: "2px solid #333",
-    color: "#fff",
-  },
-  inputFocus: {
-    border: "2px solid #8B2E2E",
-    boxShadow: "0 0 0 3px rgba(139, 46, 46, 0.2)",
-  },
-  button: {
-    ...base.button,
-    background: "#8B2E2E",
-    color: "#fff",
-  },
-  buttonHover: {
-    background: "#A03A3A",
-  },
-  link: { ...base.link, color: "#8B2E2E" },
-  error: {
-    ...base.error,
-    background: "#2a2a2a",
-    color: "#dc2626",
-    border: "1px solid #dc2626",
   },
 };
 

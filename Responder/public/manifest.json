@@ -1,0 +1,35 @@
+{
+  "name": "Aegis Responder",
+  "short_name": "Aegis",
+  "description": "Emergency response system for first responders - Report disasters offline",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#8B2E2E",
+  "theme_color": "#8B2E2E",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "New Report",
+      "short_name": "Report",
+      "description": "Create a new incident report",
+      "url": "/",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

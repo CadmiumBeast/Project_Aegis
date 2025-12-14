@@ -21,6 +21,14 @@ function Signup({ switchToLogin, onSuccess }) {
       return;
     }
 
+    // Phone number validation
+    const phoneRegex = /^[0-9]{10}$/; // 10 digits
+    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    if (!phoneRegex.test(cleanPhone)) {
+      setError("Phone number must be exactly 10 digits");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -107,10 +115,16 @@ function Signup({ switchToLogin, onSuccess }) {
               <label style={styles.label}>Phone Number</label>
               <input
                 type="tel"
-                placeholder="Enter your phone number"
+                placeholder="10 digit phone number (e.g., 0771234567)"
                 style={styles.input}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  // Only allow digits
+                  const value = e.target.value.replace(/\D/g, '');
+                  if (value.length <= 10) {
+                    setPhone(value);
+                  }
+                }}
                 onFocus={(e) => {
                   e.target.style.border = "2px solid #8B2E2E";
                   e.target.style.boxShadow = "0 0 0 3px rgba(139, 46, 46, 0.1)";
@@ -120,7 +134,11 @@ function Signup({ switchToLogin, onSuccess }) {
                   e.target.style.boxShadow = "none";
                 }}
                 disabled={loading}
+                maxLength={10}
               />
+              <span style={styles.hint}>
+                {phone.length > 0 && `${phone.length}/10 digits`}
+              </span>
             </div>
 
             <div style={styles.inputGroup}>
@@ -357,6 +375,12 @@ const styles = {
     background: "#fee2e2",
     color: "#dc2626",
     border: "1px solid #fecaca",
+    fontWeight: "500",
+  },
+  hint: {
+    fontSize: "0.75rem",
+    color: "#8B2E2E",
+    marginTop: "0.25rem",
     fontWeight: "500",
   },
 };

@@ -3,12 +3,11 @@
 // export default PastReports;
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllReports, initDB } from "../../utils/indexedDB";
-import { collection, query, getDocs, where } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { collection, query, getDocs, where } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 import MapDisplay from "../MapDisplay";
 
 function PastReports() {
@@ -20,45 +19,37 @@ function PastReports() {
     const fetchReports = async () => {
       try {
         await initDB();
-        
-        // Get local reports from IndexedDB
+
         const localReports = await getAllReports();
-        console.log('📱 Local reports:', localReports.length);
-        
-        // Get synced reports from Firebase (if user is authenticated)
+
         let firebaseReports = [];
         if (auth.currentUser) {
-          try {
-            const reportsRef = collection(db, 'responderReports');
-            const q = query(reportsRef, where('responderID', '==', auth.currentUser.uid));
-            const snapshot = await getDocs(q);
-            
-            firebaseReports = snapshot.docs.map(doc => ({
-              id: 'firebase_' + doc.id,
-              ...doc.data(),
-              synced: true,
-              fromFirebase: true,
-            }));
-            console.log('☁️ Firebase reports:', firebaseReports.length);
-          } catch (firebaseError) {
-            console.warn('Could not fetch Firebase reports:', firebaseError);
-          }
+          const reportsRef = collection(db, "responderReports");
+          const q = query(
+            reportsRef,
+            where("responderID", "==", auth.currentUser.uid)
+          );
+          const snapshot = await getDocs(q);
+
+          firebaseReports = snapshot.docs.map((doc) => ({
+            id: "firebase_" + doc.id,
+            ...doc.data(),
+            synced: true,
+            fromFirebase: true,
+          }));
         }
-        
-        // Combine and deduplicate reports
+
         const allReports = [...localReports, ...firebaseReports];
-        
-        // Sort by timestamp (newest first)
+
         allReports.sort((a, b) => {
           const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
           const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           return timeB - timeA;
         });
-        
+
         setReports(allReports);
-        console.log('📊 Total reports:', allReports.length);
       } catch (error) {
-        console.error('Error fetching reports:', error);
+        console.error("Error fetching reports:", error);
       } finally {
         setLoading(false);
       }
@@ -66,22 +57,30 @@ function PastReports() {
 
     fetchReports();
 
-    // Refresh reports when page becomes visible
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchReports();
-      }
+      if (!document.hidden) fetchReports();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
   return (
     <div style={styles.screen}>
       <div style={styles.container}>
         <div style={styles.card}>
+          {/* 🔙 Top-right back button */}
+          <button
+            style={styles.backButton}
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+          >
+            ←
+          </button>
+
           <h2 style={styles.title}>Past Reports</h2>
+
           {loading ? (
             <p style={styles.loading}>Loading reports…</p>
           ) : reports.length === 0 ? (
@@ -100,14 +99,31 @@ function PastReports() {
                     {r.synced ? "✓ Synced" : "⧗ Pending"}
                   </span>
                 </div>
-                <p style={styles.reportText}><strong>Severity:</strong> {r.severity}</p>
-                {r.description && <p style={styles.reportText}><strong>Description:</strong> {r.description}</p>}
+
+                <p style={styles.reportText}>
+                  <strong>Severity:</strong> {r.severity}
+                </p>
+
+                {r.description && (
+                  <p style={styles.reportText}>
+                    <strong>Description:</strong> {r.description}
+                  </p>
+                )}
+
                 {r.latitude && r.longitude && (
                   <>
-                    <MapDisplay latitude={r.latitude} longitude={r.longitude} incidentType={r.incidentType} />
-                    <p style={styles.reportText}><strong>Coordinates:</strong> {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}</p>
+                    <MapDisplay
+                      latitude={r.latitude}
+                      longitude={r.longitude}
+                      incidentType={r.incidentType}
+                    />
+                    <p style={styles.reportText}>
+                      <strong>Coordinates:</strong>{" "}
+                      {r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}
+                    </p>
                   </>
                 )}
+
                 {r.photo && (
                   <img
                     src={r.photo}
@@ -115,18 +131,26 @@ function PastReports() {
                     style={styles.reportImage}
                   />
                 )}
+
                 <p style={styles.timestamp}>
-                  <strong>Created:</strong> {new Date(r.createdAt).toLocaleString()}
+                  <strong>Created:</strong>{" "}
+                  {new Date(r.createdAt).toLocaleString()}
                 </p>
+
                 {r.syncedAt && (
                   <p style={styles.timestamp}>
-                    <strong>Synced:</strong> {new Date(r.syncedAt).toLocaleString()}
+                    <strong>Synced:</strong>{" "}
+                    {new Date(r.syncedAt).toLocaleString()}
                   </p>
                 )}
               </div>
             ))
           )}
-          <button style={styles.button} onClick={() => navigate("/responder-form")}>
+
+          <button
+            style={styles.button}
+            onClick={() => navigate("/responder-form")}
+          >
             Back to Form
           </button>
         </div>
@@ -147,13 +171,31 @@ const styles = {
   },
   container: { width: "100%", maxWidth: "500px" },
   card: {
+    position: "relative",
     background: "#fff",
     borderRadius: "20px",
     padding: "2rem",
-    boxShadow: "0 10px 40px rgba(0,0,0,0.5), 0 0 10px #00000020 inset",
-    border: "1px solid rgba(0,0,0,0.1)",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
     maxHeight: "90vh",
     overflowY: "auto",
+  },
+  backButton: {
+    position: "absolute",
+    top: "15px",
+    right: "15px",
+    background: "#8B2E2E",
+    color: "#fff",
+    border: "none",
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    fontSize: "1.2rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     fontSize: "1.75rem",
@@ -169,7 +211,6 @@ const styles = {
     borderRadius: "12px",
     padding: "15px",
     marginBottom: "12px",
-    border: "1px solid #e0e0e0",
     boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
   },
   reportHeader: {
@@ -190,14 +231,13 @@ const styles = {
     fontSize: "11px",
     fontWeight: "bold",
   },
-  reportText: { fontSize: "0.95rem", marginBottom: "6px", color: "#333" },
-  timestamp: { fontSize: "0.8rem", color: "#666", marginTop: "2px" },
+  reportText: { fontSize: "0.95rem", color: "#333" },
+  timestamp: { fontSize: "0.8rem", color: "#666" },
   reportImage: {
     width: "100%",
     height: "150px",
     objectFit: "cover",
     borderRadius: "10px",
-    marginBottom: "6px",
     marginTop: "6px",
   },
   button: {
@@ -211,8 +251,6 @@ const styles = {
     fontWeight: "700",
     marginTop: "15px",
     fontSize: "1rem",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    transition: "0.2s",
   },
 };
 
