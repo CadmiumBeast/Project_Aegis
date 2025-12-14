@@ -19,7 +19,9 @@ function PastReports() {
       try {
         await initDB();
         const allReports = await getAllReports();
-        setReports(allReports);
+        // Filter only unsynced (pending) reports
+        const pendingReports = allReports.filter(report => !report.synced);
+        setReports(pendingReports);
       } catch (error) {
         // Error fetching reports handled silently
       } finally {
@@ -44,11 +46,11 @@ function PastReports() {
     <div style={styles.screen}>
       <div style={styles.container}>
         <div style={styles.card}>
-          <h2 style={styles.title}>Past Reports</h2>
+          <h2 style={styles.title}>Pending Reports</h2>
           {loading ? (
             <p style={styles.loading}>Loading reports…</p>
           ) : reports.length === 0 ? (
-            <p style={styles.noReports}>No reports yet.</p>
+            <p style={styles.noReports}>No pending reports. All synced!</p>
           ) : (
             reports.map((r) => (
               <div key={r.id} style={styles.reportCard}>
