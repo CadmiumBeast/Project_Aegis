@@ -28,9 +28,11 @@ function ResponderForm() {
   const [lastNotificationMessage, setLastNotificationMessage] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   const recognitionRef = useRef(null);
   const restartTimeoutRef = useRef(null);
   const notificationTimeoutRef = useRef(null);
+  const retryTimeoutRef = useRef(null);
   const navigate = useNavigate();
 
   // Notification system - prevents duplicates and auto-dismisses
@@ -129,6 +131,9 @@ function ResponderForm() {
       unsubscribe();
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
@@ -384,8 +389,8 @@ function ResponderForm() {
     }
   };
 
-  // --- THE FIXED SYNC FUNCTION ---
-  const syncDataToAPI = async () => {
+  // --- THE FIXED SYNC FUNCTION WITH RETRY LOGIC ---
+  const syncDataToAPI = async (isRetry = false) => {
     if (isSyncing) return; // Prevent double syncs
     
     try {
@@ -393,11 +398,13 @@ function ResponderForm() {
       console.log('📤 Attempting to sync:', unsyncedReports.length, 'reports');
       
       if (unsyncedReports.length === 0) {
+        setRetryCount(0); // Reset retry counter
         return;
       }
 
       setIsSyncing(true);
       let syncedCount = 0;
+      let failedCount = 0;
 
       for (const report of unsyncedReports) {
         try {
@@ -405,7 +412,7 @@ function ResponderForm() {
 
           // 1. If there is a photo (Base64), upload to Storage FIRST
           if (report.photo) {
-            // Create a reference: reports/timestamp_id.jpg
+            // Create a unique reference to prevent duplicates
             const imageRef = ref(storage, `reports/${report.id}_${Date.now()}.jpg`);
             
             // Upload the Base64 string
@@ -415,7 +422,7 @@ function ResponderForm() {
             photoURL = await getDownloadURL(imageRef);
           }
 
-          // 2. Save Data to Firestore (Filter out undefined values)
+          // 2. Save Data to Firestore (with duplicate prevention)
           const reportsCollection = collection(db, "responderReports");
           const reportData = {
             incidentType: report.incidentType || "",
@@ -425,8 +432,9 @@ function ResponderForm() {
             createdAt: new Date(report.createdAt),
             syncedAt: new Date(),
             responderID: auth.currentUser ? auth.currentUser.uid : "anonymous",
+            localReportId: String(report.id), // Track local ID to prevent duplicates
           };
-          console.log(reportData);
+          
           // Only add fields if they exist and are not null/undefined
           if (report.latitude !== undefined && report.latitude !== null) {
             reportData.latitude = report.latitude;
@@ -447,17 +455,54 @@ function ResponderForm() {
 
         } catch (innerErr) {
           console.error('❌ Failed to sync report:', report.id, innerErr);
+          failedCount++;
           // Continue to the next report even if one fails
         }
       }
 
       if (syncedCount > 0) {
         showNotification(`${syncedCount} report${syncedCount > 1 ? 's' : ''} synced to HQ successfully`, 'success');
+        setRetryCount(0); // Reset retry counter on success
+      }
+      
+      // If some failed, schedule retry
+      if (failedCount > 0 && retryCount < 3) {
+        const retryDelay = Math.min(5000 * Math.pow(2, retryCount), 30000); // Exponential backoff: 5s, 10s, 20s, max 30s
+        console.log(`⏳ ${failedCount} reports failed. Retrying in ${retryDelay/1000}s... (Attempt ${retryCount + 1}/3)`);
+        
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+        }
+        
+        retryTimeoutRef.current = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          syncDataToAPI(true);
+        }, retryDelay);
+      } else if (failedCount > 0) {
+        showNotification(`${failedCount} report${failedCount > 1 ? 's' : ''} failed to sync after 3 attempts. Will retry when online.`, 'error');
+        setRetryCount(0);
       }
       
     } catch (err) {
       console.error('Sync error:', err);
-      showNotification('Failed to sync reports. Will retry when online.', 'error');
+      
+      // Retry logic for network errors
+      if (retryCount < 3) {
+        const retryDelay = Math.min(5000 * Math.pow(2, retryCount), 30000);
+        console.log(`⏳ Sync failed. Retrying in ${retryDelay/1000}s... (Attempt ${retryCount + 1}/3)`);
+        
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current);
+        }
+        
+        retryTimeoutRef.current = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          syncDataToAPI(true);
+        }, retryDelay);
+      } else {
+        showNotification('Failed to sync reports after 3 attempts. Will retry when online.', 'error');
+        setRetryCount(0);
+      }
     } finally {
       setIsSyncing(false);
     }

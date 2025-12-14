@@ -299,10 +299,24 @@ export default function HQDashboard() {
             locationName: data.locationName || '',
             description: data.description || '',
             photo_url: data.photo || null,
+            localReportId: data.localReportId || null, // Track local ID
           };
         });
         
-        setIncidents(fetchedIncidents);
+        // Remove duplicates based on localReportId (keep first occurrence)
+        const seenLocalIds = new Set();
+        const uniqueIncidents = fetchedIncidents.filter(incident => {
+          if (incident.localReportId) {
+            if (seenLocalIds.has(incident.localReportId)) {
+              console.log('🔄 Duplicate detected, filtering out:', incident.id, 'localId:', incident.localReportId);
+              return false; // Skip duplicate
+            }
+            seenLocalIds.add(incident.localReportId);
+          }
+          return true;
+        });
+        
+        setIncidents(uniqueIncidents);
         setLastUpdated(new Date());
         setIsLoadingIncidents(false);
       }, (error) => {
