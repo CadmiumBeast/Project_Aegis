@@ -27,7 +27,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    port: 5174,
     host: true,
     mimeTypes: {
       'application/javascript': ['js', 'jsx']

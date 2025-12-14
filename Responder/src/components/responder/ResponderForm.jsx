@@ -26,6 +26,8 @@ function ResponderForm() {
   const [interimText, setInterimText] = useState('');
   const [notification, setNotification] = useState(null);
   const [lastNotificationMessage, setLastNotificationMessage] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const recognitionRef = useRef(null);
   const restartTimeoutRef = useRef(null);
   const notificationTimeoutRef = useRef(null);
@@ -56,45 +58,51 @@ function ResponderForm() {
   useEffect(() => {
     initDB();
     
-    // Check if user is logged in (required for responders)
-    if (!auth.currentUser) {
-      console.log('⚠️ No user logged in - responder must be authenticated');
-      showNotification('Please log in to submit reports', 'warning');
-      return;
-    }
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setCurrentUser(user);
+        console.log('👤 Logged in as:', user.displayName || user.email);
+        
+        // Ensure user profile exists in Firestore
+        ensureUserProfile(user);
+      } else {
+        console.log('⚠️ No user logged in - responder must be authenticated');
+        showNotification('Please log in to submit reports', 'warning');
+        setCurrentUser(null);
+      }
+    });
     
-    console.log('👤 Logged in as:', auth.currentUser.displayName || auth.currentUser.email);
-    
-    // Ensure user profile exists in Firestore
-    const ensureUserProfile = async () => {
+    const ensureUserProfile = async (user) => {
       try {
         const { doc, getDoc, setDoc } = await import('firebase/firestore');
-        const userRef = doc(db, 'users', auth.currentUser.uid);
+        const userRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userRef);
         
         if (!userSnap.exists()) {
           console.log('⚠️ User profile not found, creating one...');
-          // Create a basic profile if it doesn't exist
-          await setDoc(userRef, {
-            uid: auth.currentUser.uid,
-            name: auth.currentUser.displayName || 'Responder',
-            email: auth.currentUser.email || 'No email',
+          const newProfile = {
+            uid: user.uid,
+            name: user.displayName || user.email || 'Responder',
+            email: user.email || 'No email',
             phone: 'Not provided',
             number: 'Not provided',
             role: 'responder',
             createdAt: new Date(),
             lastLogin: new Date()
-          });
+          };
+          await setDoc(userRef, newProfile);
+          setUserProfile(newProfile);
           console.log('✅ User profile created');
         } else {
-          console.log('✅ User profile exists:', userSnap.data());
+          const profileData = userSnap.data();
+          setUserProfile(profileData);
+          console.log('✅ User profile exists:', profileData);
         }
       } catch (error) {
         console.error('Error ensuring user profile:', error);
       }
     };
-    
-    ensureUserProfile();
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -118,6 +126,7 @@ function ResponderForm() {
     initializeSpeechRecognition();
     
     return () => {
+      unsubscribe();
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -576,11 +585,11 @@ function ResponderForm() {
             <p style={styles.subtitle}>Field responder submission</p>
             
             {/* User Info Display */}
-            {auth.currentUser && (
+            {userProfile && (
               <div style={styles.userInfo}>
                 <span style={styles.userIcon}>👤</span>
                 <span style={styles.userName}>
-                  {auth.currentUser.displayName || auth.currentUser.email}
+                  {userProfile.name !== 'Responder' ? userProfile.name : userProfile.email}
                 </span>
               </div>
             )}
